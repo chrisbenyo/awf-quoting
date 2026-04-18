@@ -310,18 +310,18 @@ async function loadLive() {
     if (!Array.isArray(allLive)) throw new Error(JSON.stringify(allLive));
 
     // Fetch shop_jobs to determine which quotes are won (a job in shop_jobs = won)
-    let wonQuoteNums = new Set();
+    let wonQuoteIds = new Set();
     try {
-      const sjRes = await fetch(`${SUPABASE_URL}/rest/v1/shop_jobs?select=quote_number`, {
+      const sjRes = await fetch(`${SUPABASE_URL}/rest/v1/shop_jobs?select=quote_id`, {
         headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` }
       });
       const shopJobs = sjRes.ok ? await sjRes.json() : [];
-      wonQuoteNums = new Set((Array.isArray(shopJobs) ? shopJobs : []).map(j => String(j.quote_number)));
+      wonQuoteIds = new Set((Array.isArray(shopJobs) ? shopJobs : []).map(j => j.quote_id));
     } catch(e) { console.warn('shop_jobs fetch failed', e); }
 
-    // Override won flag based on shop_jobs presence
+    // Override won flag based on shop_jobs presence (quotes.id = shop_jobs.quote_id)
     allLive.forEach(q => {
-      if (wonQuoteNums.has(String(q.quote_number || q.id))) q.won = true;
+      if (wonQuoteIds.has(q.id)) q.won = true;
     });
 
     let aprLive=0, aprWon=0, aprOpen=0, aprOpenVal=0;
