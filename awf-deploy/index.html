@@ -1,1 +1,3427 @@
 <!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWF Quoting — v6</title>
+<!-- Supabase JS library replaced with direct REST API calls -->
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+:root {
+  --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2e3248; --border2:#3d4260;
+  --text:#e8e9f0; --text2:#8b8fa8; --text3:#5a5d72;
+  --amber:#f5a623; --amber-dim:#3d2a08;
+  --teal:#2dd4bf; --teal-dim:#134e48;
+  --red:#f87171; --red-dim:#5a1a1a;
+  --green:#4ade80; --green-dim:#14532d;
+  --blue:#60a5fa; --blue-dim:#1e3a5f;
+  --warn:#f59e0b;
+  --font:'DM Mono',monospace; --sans:'DM Sans',system-ui,sans-serif;
+  --radius:6px; --sidebar-w:240px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;}
+::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:var(--bg);} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* ── LOGIN ── */
+#login-screen{display:none;align-items:center;justify-content:center;min-height:100vh;}
+#login-screen.show{display:flex;}
+.login-card{width:370px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:36px;position:relative;overflow:hidden;}
+.login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--amber),transparent);}
+.login-logo{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+.login-logo-mark{width:34px;height:34px;background:var(--amber);border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font);font-size:15px;font-weight:500;color:#000;}
+.login-logo-text{font-size:12px;color:var(--text2);line-height:1.4;}
+.login-logo-text strong{display:block;color:var(--text);font-size:14px;}
+.lfield{margin-bottom:14px;}
+.lfield label{display:block;font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);margin-bottom:5px;font-family:var(--font);}
+.lfield input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;transition:border-color .15s;}
+.lfield input:focus{outline:none;border-color:var(--amber);}
+.login-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px;}
+.login-toggle{margin-top:16px;text-align:center;font-size:12px;color:var(--text2);}
+.login-toggle a{color:var(--amber);cursor:pointer;}
+
+/* ── SHARED BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:5px;padding:8px 14px;border-radius:var(--radius);border:none;cursor:pointer;font-family:var(--sans);font-size:13px;font-weight:500;transition:all .12s;white-space:nowrap;}
+.btn-primary{background:var(--amber);color:#000;width:100%;padding:11px;font-size:14px;margin-top:4px;}
+.btn-primary:hover{background:#e09520;}
+.btn-accent{background:var(--amber);color:#000;}
+.btn-accent:hover{background:#e09520;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text);}
+.btn-danger{background:transparent;color:var(--red);border:1px solid #7a2020;}
+.btn-danger:hover{background:var(--red-dim);}
+.btn-success{background:var(--green-dim);color:var(--green);border:1px solid #1a6030;}
+.btn-success:hover{background:#1a6030;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── LOADER ── */
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:14px;}
+.loader-logo{font-family:var(--font);font-size:26px;color:var(--amber);font-weight:500;letter-spacing:.04em;}
+.loader-sub{font-size:12px;color:var(--text3);font-family:var(--font);}
+.spinner{width:22px;height:22px;border:2px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;overflow:hidden;}
+#app.visible{display:flex;}
+.topbar{position:fixed;top:0;left:0;right:0;height:46px;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;gap:10px;}
+.topbar-logo{font-family:var(--font);font-size:13px;font-weight:500;color:var(--amber);}
+.topbar-sep{width:1px;height:18px;background:var(--border);}
+.topbar-user{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px;}
+.role-badge{font-family:var(--font);font-size:10px;padding:2px 6px;border-radius:3px;letter-spacing:.05em;text-transform:uppercase;font-weight:500;}
+.role-admin{background:var(--amber-dim);color:var(--amber);}
+.role-estimator{background:var(--blue-dim);color:var(--blue);}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.save-status{font-size:11px;font-family:var(--font);color:var(--text3);}
+
+/* ── SIDEBAR ── */
+.sidebar{position:fixed;top:46px;left:0;bottom:0;width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:50;overflow:hidden;}
+.sidebar-top{padding:10px 8px 6px;}
+.sidebar-new{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border-radius:var(--radius);cursor:pointer;background:var(--amber);color:#000;border:none;font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:6px;transition:background .15s;}
+.sidebar-new:hover{background:#e09520;}
+.filter-tabs{display:flex;gap:3px;flex-wrap:wrap;padding-bottom:6px;}
+.filter-tab{font-family:var(--font);font-size:10px;padding:3px 7px;border-radius:3px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:transparent;transition:all .12s;}
+.filter-tab.active{border-color:var(--amber);color:var(--amber);background:var(--amber-dim);}
+.sidebar-search{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text);font-size:12px;font-family:var(--sans);outline:none;transition:border-color .15s;margin-bottom:6px;}
+.sidebar-search:focus{border-color:var(--amber);}
+.sidebar-search::placeholder{color:var(--text3);}
+.search-clear{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:2px 4px;}
+.search-wrap{position:relative;}
+.quote-item{padding:9px 10px;border-radius:var(--radius);cursor:pointer;margin-bottom:3px;border:1px solid transparent;transition:all .12s;}
+.quote-item:hover{background:var(--surface2);border-color:var(--border);}
+.quote-item.active{background:var(--surface2);border-color:var(--amber);}
+.qi-num{font-family:var(--font);font-size:11px;color:var(--amber);font-weight:500;}
+.qi-customer{font-size:13px;font-weight:500;margin:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.qi-meta{font-size:11px;color:var(--text2);display:flex;justify-content:space-between;}
+.sdot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;}
+.sdot-draft{background:var(--text3);} .sdot-submitted{background:var(--amber);} .sdot-approved{background:var(--green);} .sdot-rejected{background:var(--red);} .sdot-sent{background:var(--blue);}
+
+/* ── MAIN ── */
+.main-content{margin-left:var(--sidebar-w);margin-top:46px;flex:1;overflow-y:auto;}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 46px);color:var(--text3);text-align:center;gap:10px;}
+.empty-icon{font-size:44px;opacity:.3;}
+.empty-state h2{font-size:17px;color:var(--text2);font-weight:500;}
+
+/* ── QUOTE HEADER ── */
+.quote-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.quote-num{font-family:var(--font);font-size:20px;font-weight:500;color:var(--amber);}
+.status-badge{font-family:var(--font);font-size:10px;padding:3px 8px;border-radius:3px;letter-spacing:.06em;text-transform:uppercase;font-weight:500;}
+.badge-draft{background:var(--surface2);color:var(--text2);border:1px solid var(--border);}
+.badge-submitted{background:var(--amber-dim);color:var(--amber);}
+.badge-approved{background:var(--green-dim);color:var(--green);}
+.badge-rejected{background:var(--red-dim);color:var(--red);}
+.badge-sent{background:var(--blue-dim);color:var(--blue);}
+.quote-hdr-actions{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.quote-owner-name{font-size:11px;color:var(--text3);font-family:var(--font);}
+
+/* ── CUSTOMER BAR ── */
+.cbar{background:var(--surface2);border-bottom:1px solid var(--border);padding:8px 20px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.cbar input{background:transparent;border:none;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;min-width:80px;flex:1;}.cbar select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:13px;font-family:var(--sans);outline:none;padding:3px 6px;}
+.cbar input::placeholder{color:var(--text3);}
+.cbar-sep{color:var(--border2);}
+
+/* ── REVIEW BANNER ── */
+.review-banner{padding:9px 20px;display:flex;align-items:center;gap:10px;font-size:13px;border-bottom:1px solid var(--border);}
+.review-banner.submitted{background:#2a1f00;color:var(--amber);}
+.review-banner.rejected{background:var(--red-dim);color:var(--red);}
+.review-banner.approved{background:var(--green-dim);color:var(--green);}
+
+/* ── DETAIL PANEL (v4 style adapted) ── */
+.detail-tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 20px;background:var(--surface);}
+.detail-tab{padding:9px 16px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;letter-spacing:.05em;margin-bottom:-1px;transition:all .12s;}
+.detail-tab.active{color:var(--amber);border-bottom-color:var(--amber);}
+.detail-tab:hover:not(.active){color:var(--text);}
+
+.detail-list-bar{display:flex;gap:6px;align-items:center;padding:10px 20px;background:var(--surface2);border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.detail-pill{padding:4px 10px;border-radius:3px;font-size:12px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:transparent;font-family:var(--font);transition:all .12s;white-space:nowrap;}
+.detail-pill.active{border-color:var(--amber);color:var(--amber);background:var(--amber-dim);}
+.detail-pill:hover:not(.active){border-color:var(--border2);color:var(--text);}
+.add-detail-btn{padding:4px 10px;border-radius:3px;font-size:12px;cursor:pointer;border:1px dashed var(--border2);color:var(--text3);background:transparent;font-family:var(--font);transition:all .12s;}
+.add-detail-btn:hover{border-color:var(--amber);color:var(--amber);}
+
+.detail-body{padding:16px 20px;}
+
+/* BOM TABLE */
+.bom-wrap{overflow-x:auto;}
+table.bom{width:100%;border-collapse:collapse;font-size:12px;}
+table.bom th{background:var(--bg);padding:5px 7px;text-align:left;font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);white-space:nowrap;}
+table.bom td{padding:3px;border-bottom:1px solid rgba(46,64,87,.4);vertical-align:middle;}
+table.bom tr:nth-child(even) td{background:rgba(0,0,0,.08);}
+table.bom input,table.bom select{background:var(--bg);border:1px solid transparent;border-radius:3px;color:var(--text);padding:4px 5px;font-size:12px;font-family:var(--sans);outline:none;transition:border-color .12s;}
+table.bom input:focus,table.bom select:focus{border-color:var(--amber);}
+table.bom select option{background:var(--surface2);}
+.price-cell{text-align:right;font-weight:500;color:var(--amber);white-space:nowrap;padding-right:7px;min-width:68px;font-family:var(--font);font-size:12px;}
+.price-cell.warn{color:var(--warn);}
+.wt-cell{text-align:right;color:var(--text2);white-space:nowrap;padding-right:7px;min-width:58px;font-size:11px;font-family:var(--font);}
+.mm-toggle{padding:2px 6px;font-size:10px;font-weight:500;border-radius:3px;border:1px solid var(--border);cursor:pointer;font-family:var(--font);transition:all .12s;background:var(--surface2);color:var(--text2);}
+.mm-toggle.active{background:var(--amber);color:#000;border-color:var(--amber);}
+.btn-icon{padding:3px 6px;background:transparent;border:none;color:var(--text3);cursor:pointer;border-radius:3px;font-size:13px;transition:color .12s;}
+.btn-icon:hover{color:var(--red);}
+.row-btns{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+.add-item-btn{font-family:var(--font);font-size:11px;padding:4px 9px;border-radius:3px;border:1px dashed var(--border2);color:var(--text2);background:transparent;cursor:pointer;transition:all .12s;}
+.add-item-btn:hover{border-color:var(--amber);color:var(--amber);}
+.divider{height:1px;background:var(--border);margin:14px 0;}
+.flag-info{font-size:10px;color:var(--blue);}
+.flag-warn{font-size:10px;color:var(--warn);}
+
+/* DETAIL TOTALS */
+.detail-totals{background:var(--bg);border-radius:var(--radius);padding:14px;margin-top:14px;border:1px solid var(--border);}
+.detail-totals-grid{display:flex;flex-wrap:wrap;gap:10px 20px;margin-bottom:8px;}
+.total-item{display:flex;flex-direction:column;gap:2px;min-width:100px;}
+.total-item-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-family:var(--font);}
+.total-item-value{font-family:var(--font);font-size:18px;font-weight:500;color:var(--amber);white-space:nowrap;}
+.total-item-value.big{font-size:22px;}
+.total-item-value.wt{color:var(--text2);font-size:18px;white-space:nowrap;}
+
+/* QUOTE-LEVEL ITEMS */
+.ql-section{padding:0 20px 16px;}
+.ql-label{font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;}
+
+/* NOTES */
+.notes-section{padding:0 20px 100px;}
+.notes-section label{font-family:var(--font);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);display:block;margin-bottom:5px;}
+.notes-section textarea{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:13px;padding:9px 11px;resize:vertical;min-height:70px;}
+.notes-section textarea:focus{outline:none;border-color:var(--amber);}
+
+/* GRAND TOTAL FOOTER */
+.grand-total-bar{position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap;}
+.action-footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.workflow-hint{font-size:11px;color:var(--text3);font-family:var(--font);}
+.btn-submit{background:var(--amber);color:#000;font-size:14px;padding:10px 22px;font-weight:600;border-radius:var(--radius);border:none;cursor:pointer;transition:background .15s;}
+.btn-submit:hover{background:#e09520;}
+.gt-label{font-size:12px;color:var(--text2);}
+.gt-value{font-family:var(--font);font-size:20px;color:var(--amber);font-weight:500;}
+
+/* ADMIN REVIEW PANEL */
+#review-panel{display:none;position:fixed;top:46px;right:0;bottom:0;width:320px;background:var(--surface);border-left:1px solid var(--border);z-index:80;flex-direction:column;padding:18px;box-shadow:-4px 0 20px rgba(0,0,0,.4);}
+#review-panel.open{display:flex;}
+.review-panel-title{font-family:var(--font);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:14px;}
+.review-textarea{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--sans);font-size:13px;padding:9px 11px;resize:vertical;min-height:90px;margin-bottom:10px;}
+.review-textarea:focus{outline:none;border-color:var(--amber);}
+.review-actions{display:flex;flex-direction:column;gap:7px;}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;right:20px;padding:10px 16px;border-radius:7px;font-size:13px;z-index:999;pointer-events:none;background:var(--surface2);border:1px solid var(--border2);color:var(--text);transform:translateY(16px);opacity:0;transition:all .22s;}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.err{border-color:var(--red);color:var(--red);}
+.toast.ok{border-color:var(--green);color:var(--green);}
+
+/* LOCKED */
+.locked input,.locked select,.locked textarea{pointer-events:none;opacity:.8;cursor:default;}
+.locked .add-item-btn,.locked .btn-icon,.locked .add-detail-btn,.locked .add-item-btn{display:none;}
+
+
+/* PRINT */
+@page{size:portrait;margin:15mm;}
+@media print{
+  .topbar,.sidebar,.review-panel,.modal-overlay,.quote-hdr-actions,.cbar,.detail-list-bar,.detail-body,.ql-section,.notes-section,.grand-total-bar,.quote-tab-bar,.no-print{display:none!important;}
+  .main-content{margin-left:0!important;margin-top:0!important;}
+  body{background:white!important;}
+  #print-area{display:block!important;}
+  #build-area{display:none!important;}
+}
+.quote-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;}
+.quote-tab{padding:9px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;letter-spacing:.05em;margin-bottom:-1px;transition:all .12s;}
+.quote-tab.active{color:var(--amber);border-bottom-color:var(--amber);}
+.quote-tab:hover:not(.active){color:var(--text);}
+#print-area{display:none;padding:0;}
+#build-area{display:block;}
+
+/* PRINT DOCUMENT STYLES */
+.quote-print{background:white;color:#000;padding:20px 28px;max-width:none;width:100%;margin:0 auto;font-family:Arial,sans-serif;font-size:12px;box-sizing:border-box;}
+.print-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;}
+.print-logo{height:56px;}
+.print-company{text-align:right;}
+.print-company h1{font-size:20px;font-weight:700;margin-bottom:2px;}
+.print-quote-box{border:2px solid #000;padding:3px 10px;display:inline-block;font-size:18px;font-weight:700;margin-top:4px;}
+.print-meta-table{width:100%;border-collapse:collapse;margin-bottom:18px;}
+.print-meta-table td{padding:4px 8px;border:1px solid #ccc;font-size:11px;}
+.print-meta-table td:first-child{background:#f5f5f5;font-weight:600;width:130px;}
+.print-items-table{width:100%;border-collapse:collapse;margin-bottom:18px;}
+.print-items-table th{background:#1a2332;color:white;padding:7px 10px;text-align:left;font-size:11px;}
+.print-items-table th:last-child,.print-items-table td:last-child{text-align:right;}
+.print-items-table td{padding:7px 10px;border-bottom:1px solid #e0e0e0;font-size:12px;}
+.print-items-table tr:nth-child(even) td{background:#f9f9f9;}
+.print-total-row td{font-weight:700;font-size:13px;border-top:2px solid #000;background:#f5f5f5!important;}
+.print-footer{margin-top:24px;font-size:10px;color:#666;border-top:1px solid #ccc;padding-top:10px;}
+.print-preview-wrap{background:var(--surface2);min-height:100%;padding:16px 24px;display:flex;justify-content:center;}
+.print-toolbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:8px;align-items:center;}
+
+/* ODOO CUSTOMER MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:10px;width:520px;max-width:94vw;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;}
+.modal-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-family:var(--font);font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);}
+.modal-search{padding:10px 12px;border-bottom:1px solid var(--border);}
+.modal-search input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:8px 10px;font-size:13px;font-family:var(--sans);}
+.modal-search input:focus{outline:none;border-color:var(--amber);}
+.modal-list{flex:1;overflow-y:auto;padding:6px;}
+.odoo-row{padding:9px 10px;border-radius:var(--radius);cursor:pointer;transition:background .1s;border:1px solid transparent;}
+.odoo-row:hover{background:var(--surface2);border-color:var(--border);}
+.odoo-row-name{font-size:13px;font-weight:500;}
+.odoo-row-meta{font-size:11px;color:var(--text2);margin-top:2px;}
+.modal-status{padding:16px;text-align:center;font-size:13px;color:var(--text2);}
+
+/* CUSTOMER DETAIL MODAL */
+.cust-form .lfield{margin-bottom:10px;}
+.cust-form .lfield label{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);display:block;margin-bottom:4px;font-family:var(--font);}
+.cust-form .lfield input{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;color:var(--text);font-size:13px;}
+.cust-form .lfield input:focus{outline:none;border-color:var(--amber);}
+.cust-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;}
+/* ── SHOP DISPATCH SCREEN ── */
+#shop-screen{display:none;position:fixed;inset:0;top:46px;background:var(--bg);z-index:90;overflow-y:auto;}
+#shop-screen.open{display:block;}
+.shop-header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.shop-header h2{font-family:var(--font);font-size:15px;color:var(--teal);font-weight:500;}
+.shop-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 24px;}
+.shop-tab{padding:10px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;letter-spacing:.05em;margin-bottom:-1px;transition:all .12s;}
+.shop-tab.active{color:var(--teal);border-bottom-color:var(--teal);}
+.shop-tab:hover:not(.active){color:var(--text);}
+.shop-body{padding:20px 24px;max-width:1100px;}
+.shop-section-label{font-family:var(--font);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;}
+.dispatch-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;transition:border-color .15s;}
+.dispatch-card:hover{border-color:var(--border2);}
+.dispatch-card-hdr{padding:12px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;flex-wrap:wrap;}
+.dispatch-card-hdr:hover{background:var(--surface2);}
+.dispatch-po{font-family:var(--font);font-size:13px;color:var(--amber);font-weight:500;}
+.dispatch-customer{font-size:14px;font-weight:500;}
+.dispatch-due{font-family:var(--font);font-size:11px;padding:2px 7px;border-radius:3px;border:1px solid var(--border2);color:var(--text2);}
+.dispatch-due.overdue{border-color:var(--red);color:var(--red);}
+.dispatch-due.soon{border-color:var(--warn);color:var(--warn);}
+.dispatch-detail-count{font-size:11px;color:var(--text3);font-family:var(--font);margin-left:auto;}
+.dispatch-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border);}
+.dispatch-body.open{display:block;}
+.detail-dispatch-row{background:var(--surface2);border:1px solid var(--border);border-radius:6px;margin-top:10px;overflow:hidden;}
+.detail-dispatch-hdr{padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.detail-num-badge{font-family:var(--font);font-size:11px;background:var(--bg);border:1px solid var(--border2);border-radius:3px;padding:2px 7px;color:var(--text2);}
+.detail-dispatch-name{font-size:13px;font-weight:500;}
+.detail-dispatch-qty{font-size:11px;color:var(--text3);}
+.detail-dispatched-badge{font-family:var(--font);font-size:10px;padding:2px 7px;border-radius:3px;background:var(--teal-dim);color:var(--teal);border:1px solid #1a6060;margin-left:auto;}
+.item-assignment-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:2px;}
+.item-assignment-table th{background:var(--bg);padding:5px 8px;text-align:left;font-family:var(--font);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);}
+.item-assignment-table td{padding:5px 8px;border-bottom:1px solid rgba(46,64,87,.3);vertical-align:middle;}
+.item-assignment-table tr:last-child td{border-bottom:none;}
+.station-select{background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);font-size:12px;padding:3px 6px;font-family:var(--sans);}
+.station-select:focus{outline:none;border-color:var(--teal);}
+.station-select option{background:var(--surface2);}
+.dispatch-btn{background:var(--teal-dim);color:var(--teal);border:1px solid #1a7070;border-radius:var(--radius);padding:6px 14px;font-size:12px;font-family:var(--sans);font-weight:600;cursor:pointer;transition:all .12s;}
+.dispatch-btn:hover{background:#1a6060;}
+.dispatch-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* Active jobs table */
+.jobs-table{width:100%;border-collapse:collapse;font-size:13px;}
+.jobs-table th{background:var(--surface);padding:8px 12px;text-align:left;font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);}
+.jobs-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.jobs-table tr:hover td{background:var(--surface2);}
+.stage-badge{font-family:var(--font);font-size:10px;padding:2px 7px;border-radius:3px;border:1px solid;white-space:nowrap;}
+.stage-SAW{background:#1a2a1a;color:#6ee66e;border-color:#2a5a2a;}
+.stage-BURN{background:#2a1a0a;color:#f5a623;border-color:#5a3a0a;}
+.stage-PURCHASED{background:#1a1a2a;color:#60a5fa;border-color:#2a2a5a;}
+.stage-FIT{background:#1a1a3a;color:#a78bfa;border-color:#3a2a6a;}
+.stage-WELD{background:#2a1a1a;color:#f87171;border-color:#6a2a2a;}
+.stage-CLEAN{background:#1a2a2a;color:#2dd4bf;border-color:#1a5a5a;}
+.stage-PRIME{background:#2a2a1a;color:#d4d42d;border-color:#5a5a1a;}
+.stage-BLAST{background:#2a1a2a;color:#d42dd4;border-color:#5a1a5a;}
+.stage-SHIP{background:var(--green-dim);color:var(--green);border-color:#1a6030;}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="loader-logo">AWF</div>
+  <div class="spinner"></div>
+  <div class="loader-sub">Loading…</div>
+</div>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-mark">AW</div>
+      <div class="login-logo-text"><strong>All Welding &amp; Fabrication</strong>Quoting System v6</div>
+    </div>
+    <div style="font-size:18px;font-weight:600;margin-bottom:4px" id="login-title">Sign in</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:22px" id="login-sub">Troy, MI — allweldfab.com</div>
+    <div class="lfield"><label>Email</label><input type="email" id="login-email" placeholder="you@allweldfab.com" autocomplete="email"></div>
+    <div class="lfield"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
+    <div class="lfield" id="login-name-field" style="display:none"><label>Full name</label><input type="text" id="login-name" placeholder="Your name"></div>
+    <button class="btn btn-primary" onclick="doAuth()" id="login-btn">Sign in</button>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-toggle"><span id="login-toggle-text">Don't have an account?</span> <a onclick="toggleAuthMode()" id="login-toggle-link">Create account</a></div>
+    <div class="login-toggle" style="margin-top:8px"><a onclick="forgotPassword()" style="color:var(--text3);font-size:11px">Forgot password?</a></div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">AWF// QUOTES</div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-user">
+      <span id="topbar-name">—</span>
+      <span class="role-badge" id="topbar-role-badge"></span>
+    </div>
+    <div class="topbar-right">
+      <span class="save-status" id="save-status"></span>
+      <button class="btn btn-ghost btn-sm" id="shop-nav-btn" onclick="openShopScreen()" style="display:none;border-color:var(--teal);color:var(--teal);">🏭 Shop</button>
+      <button class="btn btn-ghost btn-sm" onclick="openPricingDash()">⚙ Pricing</button>
+      <button class="btn btn-ghost btn-sm" onclick="showChangePassword()">Password</button>
+      <button class="btn btn-ghost btn-sm" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-top">
+      <button class="sidebar-new" onclick="newQuote()">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v11M1 6.5h11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New Quote
+      </button>
+      <div style="display:flex;gap:4px;margin-bottom:6px;">
+        <select id="sort-select" onchange="setSortOrder(this.value)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:11px;padding:3px 6px;font-family:var(--font);">
+          <option value="updated_at.desc">Recent</option>
+          <option value="number.desc">Quote # ↓</option>
+          <option value="number.asc">Quote # ↑</option>
+          <option value="customer_name.asc">Customer A→Z</option>
+          <option value="customer_name.desc">Customer Z→A</option>
+          <option value="total_price.desc">Total ↓</option>
+        </select>
+      </div>
+      <div class="search-wrap">
+        <input class="sidebar-search" id="sidebar-search" placeholder="🔍  Customer, PO, Quote #…" oninput="renderSidebar()" type="search">
+      </div>
+      <div id="filter-tabs" class="filter-tabs" style="display:none">
+        <button class="filter-tab active" onclick="setFilter('all',this)">All</button>
+        <button class="filter-tab" onclick="setFilter('draft',this)">Draft</button>
+        <button class="filter-tab" onclick="setFilter('submitted',this)">Pending</button>
+        <button class="filter-tab" onclick="setFilter('approved',this)">Approved</button>
+        <button class="filter-tab" onclick="setFilter('rejected',this)">Rejected</button>
+        <button class="filter-tab" onclick="setFilter('sent',this)">Sent</button>
+        <button class="filter-tab" onclick="setFilter('won',this)" style="color:var(--green)">Won</button>
+      </div>
+    </div>
+    <div class="quote-list" id="quote-list"></div>
+  </div>
+
+  <div class="main-content" id="main-content">
+    <div class="empty-state" id="empty-state">
+      <div class="empty-icon">📋</div>
+      <h2>No quote selected</h2>
+      <p style="font-size:13px;color:var(--text3)">Create a new quote or select one from the list.</p>
+    </div>
+  </div>
+
+  <div id="review-panel">
+    <div class="review-panel-title">Admin Review</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;">Note to estimator (optional)</div>
+    <textarea class="review-textarea" id="review-note" placeholder="Feedback…"></textarea>
+    <div class="review-actions">
+      <button class="btn btn-success" onclick="adminDecision('approved')">✓ Approve</button>
+      <button class="btn btn-danger" onclick="adminDecision('rejected')">✗ Reject — Return to Estimator</button>
+      <button class="btn btn-ghost btn-sm" onclick="adminDecision('sent')">Mark as Sent</button>
+      <div style="height:6px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="closeReviewPanel()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- SHOP DISPATCH SCREEN -->
+<div id="shop-screen">
+  <div class="shop-header">
+    <h2>🏭 Shop Floor Dispatch</h2>
+    <button class="btn btn-ghost btn-sm" onclick="closeShopScreen()">← Back to Quotes</button>
+    <button class="btn btn-ghost btn-sm" onclick="loadShopScreen()" style="margin-left:auto;">⟳ Refresh</button>
+  </div>
+  <div class="shop-tabs">
+    <button class="shop-tab active" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
+    <button class="shop-tab" id="stab-active" onclick="switchShopTab('active',this)">Active Jobs</button>
+  </div>
+  <div class="shop-body">
+    <div id="shop-pending-panel">
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input id="pending-search" class="sidebar-search" placeholder="🔍  Search PO, customer…" oninput="filterPendingList()" style="max-width:320px;margin-bottom:0;">
+      </div>
+      <div id="shop-pending-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
+    </div>
+    <div id="shop-active-panel" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:14px;">
+        <input id="active-search" class="sidebar-search" placeholder="🔍  Search PO, customer, detail, log #…" oninput="filterActiveList()" style="max-width:380px;margin-bottom:0;">
+      </div>
+      <div id="shop-active-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Odoo Customer Picker Modal -->
+<div class="modal-overlay" id="odoo-modal">
+  <div class="modal">
+    <div class="modal-header"><span class="modal-title">Import customer from Odoo</span><button class="btn btn-ghost btn-sm" onclick="closeOdooModal()">✕ Close</button></div>
+    <div class="modal-search"><input type="text" id="odoo-search" placeholder="Search by name…" oninput="filterOdooList(this.value)"></div>
+    <div class="modal-list" id="odoo-list"><div class="modal-status">Click "Load from Odoo" to fetch your customer list.</div></div>
+    <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-accent btn-sm" onclick="fetchOdooCustomers()">⟳ Load from Odoo</button>
+      <span style="font-size:11px;color:var(--text3)" id="odoo-count"></span>
+      <span style="font-size:11px;color:var(--text3);margin-left:auto">Requires Odoo open in same browser</span>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="cust-modal">
+  <div class="modal" style="max-height:none;">
+    <div class="modal-header"><span class="modal-title">Customer record</span><button class="btn btn-ghost btn-sm" onclick="closeCustModal()">✕</button></div>
+    <div style="padding:16px 18px;" class="cust-form">
+      <div class="cust-form-grid">
+        <div class="lfield"><label>Company / Customer name</label><input type="text" id="cf-name" placeholder="Acme Corp"></div>
+        <div class="lfield"><label>Contact name</label><input type="text" id="cf-contact" placeholder="Jane Smith"></div>
+        <div class="lfield"><label>Quotes email</label><input type="email" id="cf-email-quotes" placeholder="quotes@customer.com"></div>
+        <div class="lfield"><label>AP email</label><input type="email" id="cf-email-ap" placeholder="ap@customer.com"></div>
+        <div class="lfield"><label>Phone</label><input type="tel" id="cf-phone" placeholder="248-555-0100"></div>
+        <div class="lfield"><label>Odoo partner ID</label><input type="text" id="cf-odoo-id" readonly style="opacity:.5"></div>
+      </div>
+    </div>
+    <div style="padding:10px 18px 16px;display:flex;gap:8px;">
+      <button class="btn btn-accent" onclick="saveCustomer()" style="flex:1;">Save &amp; Use This Customer</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeCustModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal" style="max-height:none;">
+    <div class="modal-header">
+      <span class="modal-title">Change password</span>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pw-modal').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:16px 18px;" class="cust-form">
+      <div class="lfield"><label>New password</label><input type="password" id="pw-new" placeholder="Min 6 characters"></div>
+      <div class="lfield"><label>Confirm password</label><input type="password" id="pw-confirm" placeholder="Repeat password"></div>
+      <div style="color:var(--red);font-size:12px;min-height:16px;margin-top:4px" id="pw-err"></div>
+    </div>
+    <div style="padding:10px 18px 16px;display:flex;gap:8px;">
+      <button class="btn btn-accent" onclick="changePassword()" style="flex:1;">Set Password</button>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('pw-modal').classList.remove('open')">Cancel</button>
+    </div>
+  </div>
+</div>
+<!-- PDF BOM Import Modal -->
+  </div>
+</div>
+
+<!-- PRICING DASHBOARD MODAL -->
+<div class="modal-overlay" id="pricing-modal">
+  <div class="modal" style="width:560px;max-height:85vh;">
+    <div class="modal-header">
+      <span class="modal-title">⚙ Pricing Dashboard</span>
+      <button class="btn btn-ghost btn-sm" onclick="closePricingDash()">✕ Close</button>
+    </div>
+    <div style="padding:16px 18px;overflow-y:auto;max-height:calc(85vh - 60px);">
+      <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Current Rates — $/lb</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div>
+          <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Flat / Plate</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--text3);font-family:var(--font);font-size:13px;">$</span>
+            <input type="number" id="pr-flat" step="0.01" min="0" style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font);">/lb</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Tube</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--text3);font-family:var(--font);font-size:13px;">$</span>
+            <input type="number" id="pr-tube" step="0.01" min="0" style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font);">/lb</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Angle</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--text3);font-family:var(--font);font-size:13px;">$</span>
+            <input type="number" id="pr-angle" step="0.01" min="0" style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font);">/lb</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">C Channel</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:var(--text3);font-family:var(--font);font-size:13px;">$</span>
+            <input type="number" id="pr-channel" step="0.01" min="0" style="width:90px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);">
+            <span style="font-size:11px;color:var(--text3);font-family:var(--font);">/lb</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Note (optional)</label>
+        <input type="text" id="pr-note" placeholder="e.g. Raised sheet — Alro invoice 3/31" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:13px;font-family:var(--sans);">
+      </div>
+      <button class="btn btn-accent" style="width:100%;margin-bottom:20px;" onclick="savePricingRates()">Save Rates →</button>
+      <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Change History</div>
+      <div id="pricing-history" style="font-size:12px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WON MODAL — PO# + Due Date capture -->
+<div class="modal-overlay" id="won-modal">
+  <div class="modal" style="max-height:none;width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">🏆 Mark as Won</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeWonModal()">✕</button>
+    </div>
+    <div style="padding:18px 18px 10px;" class="cust-form">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">Enter the customer PO details to complete this win.</div>
+      <div class="lfield">
+        <label>Customer PO Number <span style="color:var(--red)">*</span></label>
+        <input type="text" id="won-po" placeholder="e.g. PO-24601" autocomplete="off"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--font);">
+      </div>
+      <div class="lfield">
+        <label>Due Date / Required Ship Date</label>
+        <input type="date" id="won-due" 
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--font);">
+      </div>
+      <div style="color:var(--red);font-size:12px;min-height:16px;margin-top:2px;" id="won-err"></div>
+    </div>
+    <div style="padding:10px 18px 16px;display:flex;gap:8px;">
+      <button class="btn btn-success" onclick="confirmWon()" style="flex:1;font-size:14px;padding:11px;">✓ Confirm Win</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeWonModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- DISPATCH MODAL — Log # capture -->
+<div class="modal-overlay" id="dispatch-modal">
+  <div class="modal" style="max-height:none;width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">🏭 Release to Floor</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeDispatchModal()">✕</button>
+    </div>
+    <div style="padding:18px 18px 10px;" class="cust-form">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;">Confirm details before releasing to shop floor.</div>
+      <div style="font-family:var(--font);font-size:11px;color:var(--text3);margin-bottom:16px;" id="dispatch-modal-detail">—</div>
+      <div class="lfield">
+        <label>Detail Name <span style="color:var(--text3);font-size:10px;">(edit if needed)</span></label>
+        <input type="text" id="dispatch-modal-name" placeholder="e.g. BASE FRAME"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--sans);">
+      </div>
+      <div class="lfield">
+        <label>Log Number <span style="color:var(--red)">*</span></label>
+        <input type="text" id="dispatch-modal-log" placeholder="e.g. 1042" maxlength="20" autocomplete="off"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--amber);font-size:18px;font-family:var(--font);font-weight:500;letter-spacing:.05em;">
+      </div>
+      <div style="color:var(--red);font-size:12px;min-height:16px;margin-top:2px;" id="dispatch-modal-err"></div>
+    </div>
+    <div style="padding:10px 18px 16px;display:flex;gap:8px;">
+      <button class="btn btn-success" onclick="confirmDispatchModal()" style="flex:1;font-size:14px;padding:11px;">🏭 Release to Floor</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeDispatchModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// GLOBAL ERROR HANDLER — catch silent JS crashes
+// ============================================================
+window.addEventListener('unhandledrejection', e => {
+  console.error('Unhandled promise rejection:', e.reason);
+  const msg = e.reason?.message || String(e.reason);
+  // Show toast for auth errors
+  if(msg.includes('JWT')||msg.includes('session')||msg.includes('auth')||msg.includes('lock')){
+    toast('Session error — please refresh','err');
+  }
+  // Prevent the error from killing the page
+  e.preventDefault();
+});
+window.addEventListener('error', e => {
+  console.error('Global error:', e.message, e.filename, e.lineno);
+  e.preventDefault();
+});
+
+// ============================================================
+// SUPABASE REST CLIENT — no library, no locks, no background processes
+// ============================================================
+const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+
+// Auth token storage
+let _authToken = null;
+let _refreshToken = null;
+let _tokenExpiry = null;
+
+// Save/load token from localStorage
+function saveTokens(access, refresh, expiresIn) {
+  _authToken = access;
+  _refreshToken = refresh;
+  _tokenExpiry = Date.now() + (expiresIn * 1000);
+  try {
+    localStorage.setItem('awf_token', JSON.stringify({access, refresh, expiry: _tokenExpiry}));
+  } catch(e) {}
+}
+function loadTokens() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('awf_token') || 'null');
+    if (stored && stored.expiry > Date.now()) {
+      _authToken = stored.access;
+      _refreshToken = stored.refresh;
+      _tokenExpiry = stored.expiry;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+function clearTokens() {
+  _authToken = null; _refreshToken = null; _tokenExpiry = null;
+  try { localStorage.removeItem('awf_token'); } catch(e) {}
+}
+
+// Core REST fetch — all DB calls go through here
+async function sbFetch(path, options={}) {
+  // Refresh token if expiring in less than 5 minutes
+  if (_authToken && _tokenExpiry && _tokenExpiry - Date.now() < 300000) {
+    await sbRefreshToken();
+  }
+  const headers = {
+    'apikey': SUPABASE_ANON,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...options.headers
+  };
+  if (_authToken) headers['Authorization'] = 'Bearer ' + _authToken;
+  const res = await fetch(SUPABASE_URL + path, { ...options, headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({message: res.statusText}));
+    throw new Error(err.message || err.error_description || res.statusText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+// Supabase query builder replacement
+function sb() {} // placeholder for IDE
+const sbDB = {
+  from(table) {
+    return new QueryBuilder(table);
+  }
+};
+
+class QueryBuilder {
+  constructor(table) {
+    this._table = table;
+    this._filters = [];
+    this._select = '*';
+    this._order = null;
+    this._limit = null;
+    this._single = false;
+  }
+  select(cols) { this._select = cols; return this; }
+  eq(col, val) { this._filters.push(`${col}=eq.${encodeURIComponent(val)}`); return this; }
+  order(col, {ascending=true, nullsFirst=false}={}) {
+    this._order = `${col}.${ascending?'asc':'desc'}${nullsFirst?'.nullsfirst':''}`;
+    return this;
+  }
+  single() { this._single = true; return this; }
+  limit(n) { this._limit = n; return this; }
+
+  _buildUrl(extra='') {
+    let url = `/rest/v1/${this._table}?select=${encodeURIComponent(this._select)}`;
+    for (const f of this._filters) url += '&' + f;
+    if (this._order) url += '&order=' + this._order;
+    if (this._limit) url += '&limit=' + this._limit;
+    return url + extra;
+  }
+
+  // SELECT
+  async then(resolve, reject) {
+    try {
+      const url = this._buildUrl();
+      const headers = {};
+      if (this._single) headers['Accept'] = 'application/vnd.pgrst.object+json';
+      const data = await sbFetch(url, {headers});
+      resolve({data, error: null});
+    } catch(e) {
+      resolve({data: null, error: e});
+    }
+  }
+
+  // INSERT — returns self for chaining .select().single()
+  insert(rows) {
+    this._insertRows = Array.isArray(rows) ? rows : [rows];
+    this._method = 'POST';
+    return this;
+  }
+
+  async _doInsert() {
+    try {
+      const data = await sbFetch(`/rest/v1/${this._table}`, {
+        method: 'POST',
+        body: JSON.stringify(this._insertRows)
+      });
+      const result = Array.isArray(data) ? data : [data];
+      if (this._single) return {data: result[0] || null, error: null};
+      return {data: result, error: null};
+    } catch(e) { return {data: null, error: e}; }
+  }
+
+  // UPDATE — returns chainable object
+  update(patch) {
+    this._patch = patch;
+    this._method = 'PATCH';
+    return this;
+  }
+
+  // DELETE — returns chainable object  
+  delete() {
+    this._method = 'DELETE';
+    return this;
+  }
+
+  // Execute UPDATE or DELETE (called via await or .then())
+  async _execute() {
+    try {
+      let url = `/rest/v1/${this._table}?`;
+      const filterStr = this._filters.join('&');
+      url += filterStr || 'id=eq.null'; // safety fallback
+      const opts = { method: this._method || 'GET' };
+      if (this._patch) opts.body = JSON.stringify(this._patch);
+      const data = await sbFetch(url, opts);
+      return {data, error: null};
+    } catch(e) { return {data: null, error: e}; }
+  }
+
+  // Allow await on all chains
+  async then(resolve, reject) {
+    if (this._method === 'POST') {
+      const result = await this._doInsert();
+      resolve(result);
+      return;
+    }
+    if (this._method === 'PATCH' || this._method === 'DELETE') {
+      const result = await this._execute();
+      resolve(result);
+      return;
+    }
+    // SELECT
+    try {
+      let url = `/rest/v1/${this._table}?select=${encodeURIComponent(this._select)}`;
+      for (const f of this._filters) url += '&' + f;
+      if (this._order) url += '&order=' + this._order;
+      if (this._limit) url += '&limit=' + this._limit;
+      const headers = {};
+      if (this._single) headers['Accept'] = 'application/vnd.pgrst.object+json';
+      const data = await sbFetch(url, {headers});
+      resolve({data, error: null});
+    } catch(e) {
+      resolve({data: null, error: e});
+    }
+  }
+}
+
+// Auth REST functions
+const sbAuth = {
+  async signInWithPassword({email, password}) {
+    try {
+      const data = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
+        method: 'POST',
+        headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password})
+      }).then(r => r.json());
+      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      saveTokens(data.access_token, data.refresh_token, data.expires_in);
+      return {data: {user: data.user, session: data}, error: null};
+    } catch(e) { return {data: null, error: e}; }
+  },
+
+  async signUp({email, password, options={}}) {
+    try {
+      const data = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+        method: 'POST',
+        headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+        body: JSON.stringify({email, password, data: options.data||{}})
+      }).then(r => r.json());
+      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      if (data.access_token) saveTokens(data.access_token, data.refresh_token, data.expires_in);
+      return {data: {user: data.user || data}, error: null};
+    } catch(e) { return {data: null, error: e}; }
+  },
+
+  async getSession() {
+    if (_authToken && _tokenExpiry && _tokenExpiry > Date.now()) {
+      return {data: {session: {access_token: _authToken}}, error: null};
+    }
+    if (_refreshToken) {
+      const ok = await sbRefreshToken();
+      if (ok) return {data: {session: {access_token: _authToken}}, error: null};
+    }
+    return {data: {session: null}, error: null};
+  },
+
+  async signOut() {
+    try {
+      if (_authToken) {
+        await fetch(SUPABASE_URL + '/auth/v1/logout', {
+          method: 'POST',
+          headers: {'apikey': SUPABASE_ANON, 'Authorization': 'Bearer ' + _authToken}
+        });
+      }
+    } catch(e) {}
+    clearTokens();
+    return {error: null};
+  },
+
+  async updateUser({password}) {
+    try {
+      const data = await sbFetch('/auth/v1/user', {
+        method: 'PUT',
+        body: JSON.stringify({password})
+      });
+      return {data, error: null};
+    } catch(e) { return {data: null, error: e}; }
+  },
+
+  async resetPasswordForEmail(email, {redirectTo}={}) {
+    try {
+      await fetch(SUPABASE_URL + '/auth/v1/recover', {
+        method: 'POST',
+        headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+        body: JSON.stringify({email, ...(redirectTo?{redirect_to:redirectTo}:{})})
+      });
+      return {error: null};
+    } catch(e) { return {error: e}; }
+  }
+};
+
+async function sbRefreshToken() {
+  try {
+    const data = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+      body: JSON.stringify({refresh_token: _refreshToken})
+    }).then(r => r.json());
+    if (data.access_token) {
+      saveTokens(data.access_token, data.refresh_token, data.expires_in);
+      return true;
+    }
+  } catch(e) {}
+  clearTokens();
+  return false;
+}
+
+// ============================================================
+// LOOKUP TABLES (full v4 — untouched)
+// ============================================================
+const GAUGE_TABLE={7:[0.1793,7.50],8:[0.1644,6.875],9:[0.1495,6.25],10:[0.1345,5.625],11:[0.1196,5.00],12:[0.1046,4.375],13:[0.0897,3.75],14:[0.0747,3.125],16:[0.0598,2.50],18:[0.0478,2.00],20:[0.0359,1.50]};
+const HRS_TABLE=[[3/16,7.66],[1/4,10.21],[5/16,12.75],[3/8,15.32],[7/16,17.85],[1/2,20.42],[9/16,22.95],[5/8,25.53],[3/4,30.63],[7/8,35.74],[1,40.84],[1+1/8,45.95],[1+3/16,48.45],[1+1/4,51.05],[1+3/8,56.10],[1+1/2,61.26],[1+5/8,66.30],[1+3/4,71.47],[2,81.68],[2+1/4,91.89],[2+1/2,102.0],[2+3/4,112.3],[3,122.4],[3+1/4,132.6],[3+1/2,142.8],[3+3/4,153.0],[4,163.2],[4+1/2,183.7],[5,204.1]];
+const THICKNESS_OPTIONS=[{label:'20 ga (0.036")',val:'20ga'},{label:'18 ga (0.048")',val:'18ga'},{label:'16 ga (0.060")',val:'16ga'},{label:'14 ga (0.075")',val:'14ga'},{label:'13 ga (0.090")',val:'13ga'},{label:'12 ga (0.105")',val:'12ga'},{label:'11 ga (0.120")',val:'11ga'},{label:'10 ga (0.135")',val:'10ga'},{label:'9 ga (0.150")',val:'9ga'},{label:'8 ga (0.164")',val:'8ga'},{label:'7 ga (0.179")',val:'7ga'},{label:'3/16"',val:'3/16'},{label:'1/4"',val:'1/4'},{label:'5/16"',val:'5/16'},{label:'3/8"',val:'3/8'},{label:'7/16"',val:'7/16'},{label:'1/2"',val:'1/2'},{label:'9/16"',val:'9/16'},{label:'5/8"',val:'5/8'},{label:'3/4"',val:'3/4'},{label:'7/8"',val:'7/8'},{label:'1"',val:'1'},{label:'1-1/8"',val:'1-1/8'},{label:'1-1/4"',val:'1-1/4'},{label:'1-3/8"',val:'1-3/8'},{label:'1-1/2"',val:'1-1/2'},{label:'1-5/8"',val:'1-5/8'},{label:'1-3/4"',val:'1-3/4'},{label:'2"',val:'2'},{label:'2-1/2"',val:'2-1/2'},{label:'3"',val:'3'},{label:'3-1/2"',val:'3-1/2'},{label:'4"',val:'4'},{label:'4-1/2"',val:'4-1/2'},{label:'5"',val:'5'}];
+const SQ_TUBE=[[0.5,0.5,0.035,0.221],[0.5,0.5,0.049,0.301],[0.5,0.5,0.065,0.384],[0.625,0.625,0.049,0.384],[0.625,0.625,0.065,0.495],[0.75,0.75,0.035,0.34],[0.75,0.75,0.049,0.467],[0.75,0.75,0.065,0.605],[0.75,0.75,0.083,0.753],[0.75,0.75,0.095,0.846],[0.75,0.75,0.12,1.028],[0.813,0.813,0.049,0.509],[0.813,0.813,0.065,0.661],[0.875,0.875,0.049,0.55],[0.875,0.875,0.065,0.716],[0.875,0.875,0.083,0.894],[0.875,0.875,0.095,1.008],[1.0,1.0,0.035,0.453],[1.0,1.0,0.049,0.634],[1.0,1.0,0.058,0.743],[1.0,1.0,0.065,0.827],[1.0,1.0,0.083,1.035],[1.0,1.0,0.095,1.169],[1.0,1.0,0.12,1.436],[1.25,1.25,0.049,0.8],[1.25,1.25,0.065,1.048],[1.25,1.25,0.083,1.317],[1.25,1.25,0.095,1.492],[1.25,1.25,0.12,1.844],[1.5,1.5,0.049,0.967],[1.5,1.5,0.065,1.268],[1.5,1.5,0.083,1.599],[1.5,1.5,0.095,1.815],[1.5,1.5,0.12,2.252],[1.5,1.5,0.188,3.354],[1.5,1.5,0.25,4.25],[2.0,2.0,0.065,1.71],[2.0,2.0,0.083,2.164],[2.0,2.0,0.095,2.461],[2.0,2.0,0.12,3.068],[2.0,2.0,0.188,4.632],[2.0,2.0,0.25,5.949],[2.0,2.0,0.313,7.18],[2.5,2.5,0.083,2.728],[2.5,2.5,0.095,3.107],[2.5,2.5,0.12,3.884],[2.5,2.5,0.188,5.911],[2.5,2.5,0.25,7.649],[2.5,2.5,0.313,9.309],[3.0,3.0,0.083,3.292],[3.0,3.0,0.12,4.7],[3.0,3.0,0.188,7.189],[3.0,3.0,0.25,9.349],[3.0,3.0,0.313,11.437],[3.0,3.0,0.375,13.386],[4.0,4.0,0.083,4.421],[4.0,4.0,0.12,6.331],[4.0,4.0,0.188,9.745],[4.0,4.0,0.25,12.748],[4.0,4.0,0.313,15.693],[4.0,4.0,0.375,18.485],[4.0,4.0,0.5,23.797],[5.0,5.0,0.12,7.963],[5.0,5.0,0.188,12.302],[5.0,5.0,0.25,16.148],[5.0,5.0,0.313,19.949],[5.0,5.0,0.375,23.585],[5.0,5.0,0.5,30.596],[6.0,6.0,0.12,9.595],[6.0,6.0,0.188,14.858],[6.0,6.0,0.25,19.548],[6.0,6.0,0.313,24.206],[6.0,6.0,0.375,28.684],[6.0,6.0,0.5,37.396],[6.0,6.0,0.625,45.682],[8.0,8.0,0.188,19.971],[8.0,8.0,0.25,26.347],[8.0,8.0,0.313,32.718],[8.0,8.0,0.375,38.883],[8.0,8.0,0.5,50.994],[8.0,8.0,0.625,62.68],[10.0,10.0,0.25,33.146],[10.0,10.0,0.313,41.231],[10.0,10.0,0.375,49.082],[10.0,10.0,0.5,64.592],[10.0,10.0,0.625,79.678],[12.0,12.0,0.25,39.945],[12.0,12.0,0.313,49.743],[12.0,12.0,0.375,59.281],[12.0,12.0,0.5,78.191],[12.0,12.0,0.625,96.676]];
+const RECT_TUBE=[[1.0,0.5,0.065,0.606],[1.0,0.75,0.065,0.716],[1.0,0.75,0.095,1.008],[1.5,0.5,0.065,0.826],[1.5,0.75,0.065,0.937],[1.5,0.75,0.083,1.176],[1.5,0.75,0.12,1.601],[1.5,1.0,0.049,0.8],[1.5,1.0,0.065,1.048],[1.5,1.0,0.083,1.317],[1.5,1.0,0.12,1.844],[2.0,0.75,0.065,1.158],[2.0,1.0,0.049,0.967],[2.0,1.0,0.065,1.269],[2.0,1.0,0.083,1.6],[2.0,1.0,0.095,1.815],[2.0,1.0,0.12,2.252],[2.0,1.0,0.188,3.35],[2.0,1.25,0.083,1.74],[2.0,1.25,0.12,2.456],[2.0,1.5,0.065,1.49],[2.0,1.5,0.083,1.882],[2.0,1.5,0.12,2.66],[2.0,1.5,0.188,3.994],[2.5,1.0,0.083,1.882],[2.5,1.0,0.12,2.66],[2.5,1.25,0.083,2.023],[2.5,1.5,0.083,2.164],[2.5,1.5,0.12,3.068],[2.5,1.5,0.188,4.327],[2.5,1.5,0.25,5.407],[2.5,2.0,0.12,3.351],[3.0,1.0,0.065,1.711],[3.0,1.0,0.083,2.146],[3.0,1.0,0.12,3.068],[3.0,1.0,0.188,4.327],[3.0,1.5,0.083,2.445],[3.0,1.5,0.095,2.784],[3.0,1.5,0.12,3.476],[3.0,1.5,0.188,4.966],[3.0,1.5,0.25,6.257],[3.0,2.0,0.065,2.153],[3.0,2.0,0.083,2.728],[3.0,2.0,0.095,3.107],[3.0,2.0,0.12,3.98],[3.0,2.0,0.188,5.59],[3.0,2.0,0.25,7.11],[3.0,2.0,0.313,8.438],[4.0,2.0,0.083,3.292],[4.0,2.0,0.12,4.83],[4.0,2.0,0.188,6.87],[4.0,2.0,0.25,8.81],[4.0,2.0,0.313,10.561],[4.0,2.0,0.375,12.165],[4.0,3.0,0.12,5.68],[4.0,3.0,0.188,8.15],[4.0,3.0,0.25,10.51],[4.0,3.0,0.313,12.684],[4.0,3.0,0.375,14.717],[5.0,2.0,0.12,5.68],[5.0,2.0,0.188,8.15],[5.0,2.0,0.25,10.51],[5.0,3.0,0.12,6.332],[5.0,3.0,0.188,9.42],[5.0,3.0,0.25,12.21],[5.0,3.0,0.375,17.27],[5.0,4.0,0.188,10.7],[5.0,4.0,0.25,13.91],[5.0,4.0,0.375,19.821],[6.0,2.0,0.188,9.42],[6.0,2.0,0.25,12.21],[6.0,3.0,0.188,10.7],[6.0,3.0,0.25,13.91],[6.0,3.0,0.375,19.821],[6.0,4.0,0.188,11.97],[6.0,4.0,0.25,15.62],[6.0,4.0,0.375,22.37],[6.0,4.0,0.5,28.43],[8.0,4.0,0.188,14.53],[8.0,4.0,0.25,19.02],[8.0,4.0,0.375,27.48],[8.0,4.0,0.5,35.24],[8.0,6.0,0.25,22.42],[8.0,6.0,0.375,32.58],[8.0,6.0,0.5,42.05],[10.0,4.0,0.188,17.08],[10.0,4.0,0.25,22.42],[10.0,4.0,0.375,32.58],[10.0,6.0,0.188,19.63],[10.0,6.0,0.25,25.82],[10.0,6.0,0.375,37.69],[10.0,6.0,0.5,48.85],[12.0,4.0,0.188,19.63],[12.0,4.0,0.25,25.82],[12.0,4.0,0.375,37.69],[12.0,6.0,0.25,29.23],[12.0,6.0,0.375,42.79],[12.0,6.0,0.5,55.66],[12.0,8.0,0.25,32.63],[12.0,8.0,0.375,47.9],[12.0,8.0,0.5,62.46]];
+const RND_TUBE=[[1.315,0.083,1.092],[1.315,0.125,1.589],[1.66,0.083,1.398],[1.66,0.125,2.049],[1.9,0.125,2.37],[2.375,0.125,3.004],[2.375,0.188,4.391],[2.875,0.125,3.671],[2.875,0.188,5.395],[2.875,0.25,7.009],[3.5,0.125,4.506],[3.5,0.188,6.65],[3.5,0.25,8.678],[3.5,0.312,10.623],[4.0,0.125,5.173],[4.0,0.188,7.654],[4.0,0.25,10.013],[4.0,0.312,12.289],[4.0,0.375,14.518],[5.0,0.125,6.508],[5.0,0.188,9.662],[5.0,0.25,12.683],[5.0,0.312,15.621],[5.0,0.375,18.523],[6.0,0.125,7.843],[6.0,0.188,11.67],[6.0,0.25,15.353],[6.0,0.312,18.953],[6.0,0.375,22.528],[8.625,0.322,28.554],[8.625,0.375,33.041],[10.75,0.375,41.552],[12.0,0.25,31.373],[12.0,0.375,46.558],[12.0,0.5,61.41]];
+// C Channel: [depth_in, flange_in, web_thickness_in, lb_per_ft]
+const C_CHANNEL=[
+  [3,1.410,0.170,4.1],[3,1.498,0.258,5.0],
+  [4,1.580,0.184,5.4],[4,1.647,0.247,7.25],
+  [5,1.750,0.190,6.7],[5,1.885,0.325,9.0],
+  [6,1.920,0.200,8.2],[6,2.034,0.314,10.5],[6,2.157,0.437,13.0],
+  [7,2.110,0.210,9.8],[7,2.194,0.294,12.25],
+  [8,2.260,0.220,11.5],[8,2.343,0.303,13.75],[8,2.527,0.487,18.75],
+  [9,2.430,0.230,13.4],[9,2.648,0.448,20.0],
+  [10,2.600,0.240,15.3],[10,2.739,0.379,20.0],[10,2.886,0.526,25.0],[10,3.033,0.673,30.0],
+  [12,2.940,0.260,20.7],[12,3.047,0.367,25.0],[12,3.170,0.510,30.0],
+  [15,3.400,0.400,33.9],[15,3.716,0.716,50.0],
+];
+function cChannelLookup(depth,flange,wall){
+  // Match by depth, then closest flange/wall
+  let best=null,bestScore=Infinity;
+  for(const row of C_CHANNEL){
+    const score=Math.abs(row[0]-depth)+Math.abs(row[1]-flange)+Math.abs(row[2]-wall);
+    if(score<bestScore){bestScore=score;best=row;}
+  }
+  if(!best) return null;
+  return{wt:best[3],poorMatch:bestScore>1.0,matchDesc:`C${best[0]}×${best[3]}lb/ft`};
+}
+
+const ANGLE=[[0.75,0.75,0.125,0.59],[1.0,1.0,0.125,0.80],[1.0,1.0,0.1875,1.16],[1.0,1.0,0.25,1.49],[1.25,1.25,0.125,1.01],[1.25,1.25,0.1875,1.48],[1.25,1.25,0.25,1.92],[1.5,1.5,0.125,1.23],[1.5,1.5,0.1875,1.80],[1.5,1.5,0.25,2.34],[1.5,1.5,0.3125,2.86],[2.0,2.0,0.125,1.65],[2.0,2.0,0.1875,2.44],[2.0,2.0,0.25,3.19],[2.0,2.0,0.3125,3.92],[2.0,2.0,0.375,4.70],[2.5,2.5,0.1875,3.07],[2.5,2.5,0.25,4.10],[2.5,2.5,0.3125,5.00],[2.5,2.5,0.375,5.90],[2.5,2.5,0.5,7.70],[3.0,3.0,0.1875,3.71],[3.0,3.0,0.25,4.90],[3.0,3.0,0.3125,6.10],[3.0,3.0,0.375,7.20],[3.0,3.0,0.5,9.40],[3.5,3.5,0.25,5.80],[3.5,3.5,0.3125,7.20],[3.5,3.5,0.375,8.50],[3.5,3.5,0.5,11.1],[4.0,4.0,0.25,6.60],[4.0,4.0,0.3125,8.20],[4.0,4.0,0.375,9.80],[4.0,4.0,0.5,12.8],[4.0,4.0,0.625,15.7],[4.0,4.0,0.75,18.5],[5.0,5.0,0.3125,10.3],[5.0,5.0,0.375,12.3],[5.0,5.0,0.5,16.2],[5.0,5.0,0.625,20.0],[6.0,6.0,0.375,14.9],[6.0,6.0,0.5,19.6],[6.0,6.0,0.625,24.2],[6.0,6.0,0.75,28.7],[6.0,6.0,1.0,37.4],[2.0,1.5,0.1875,2.12],[2.0,1.5,0.25,2.77],[2.5,2.0,0.1875,2.75],[2.5,2.0,0.25,3.62],[2.5,2.0,0.375,5.30],[3.0,2.0,0.25,4.10],[3.0,2.0,0.3125,5.10],[3.0,2.0,0.375,6.10],[3.0,2.5,0.25,4.50],[3.0,2.5,0.3125,5.60],[3.0,2.5,0.375,6.60],[3.5,2.5,0.25,5.10],[3.5,2.5,0.375,7.40],[4.0,3.0,0.25,5.80],[4.0,3.0,0.3125,7.20],[4.0,3.0,0.375,8.50],[4.0,3.0,0.5,11.1],[5.0,3.0,0.25,6.60],[5.0,3.0,0.375,9.80],[5.0,4.0,0.375,11.0],[5.0,4.0,0.5,14.6],[6.0,4.0,0.375,12.3],[6.0,4.0,0.5,16.2],[6.0,4.0,0.75,23.6]];
+
+const CONFIG={materialRate:2.25,tubeMaterialRate:2.20,angleMaterialRate:2.20,flatMinPrice:13.00,tubeMinPrice:5.00,angleMinPrice:5.00,roundTubePromptOD:2.0};
+
+// ============================================================
+// HELPERS
+// ============================================================
+function parseFraction(str){
+  if(str===null||str===undefined||str==='') return null;
+  str=String(str).trim();
+  const ga=str.match(/^(\d+)\s*ga$/i);
+  if(ga){const g=GAUGE_TABLE[parseInt(ga[1])];return g?g[0]:null;}
+  const mixed=str.match(/^(\d+)[- ](\d+)\/(\d+)$/);
+  if(mixed) return +mixed[1]+(+mixed[2]/+mixed[3]);
+  const frac=str.match(/^(\d+)\/(\d+)$/);
+  if(frac) return +frac[1]/+frac[2];
+  const n=parseFloat(str);
+  return isNaN(n)?null:n;
+}
+function resolveLength(val,unit){
+  const n=parseFraction(val);
+  if(n===null) return null;
+  return unit==='mm'?n/25.4:n;
+}
+function hrsLookup(thickVal){
+  const ga=String(thickVal||'').trim().match(/^(\d+)\s*ga$/i);
+  if(ga){const g=GAUGE_TABLE[parseInt(ga[1])];if(g) return {thick:g[0],wtPerSqFt:g[1]};}
+  const t=parseFraction(thickVal);
+  if(t===null) return null;
+  let best=null,bestDiff=Infinity;
+  for(const[th,w]of HRS_TABLE){const d=Math.abs(th-t);if(d<bestDiff){bestDiff=d;best={thick:th,wtPerSqFt:w};}}
+  return best;
+}
+function tubeLookup(type,h,w,wall){
+  const table=type==='round'?RND_TUBE:(type==='square'?SQ_TUBE:RECT_TUBE);
+  let best=null,bestScore=Infinity;
+  for(const row of table){
+    const score=type==='round'?Math.abs(row[0]-h)+Math.abs(row[1]-wall):Math.abs(row[0]-h)+Math.abs(row[1]-w)+Math.abs(row[2]-wall);
+    if(score<bestScore){bestScore=score;best=row;}
+  }
+  if(!best) return null;
+  const THRESHOLD=0.5;
+  let poorMatch=false;
+  if(type==='round') poorMatch=Math.abs(best[0]-h)>THRESHOLD||Math.abs(best[1]-wall)>THRESHOLD;
+  else poorMatch=Math.abs(best[0]-h)>THRESHOLD||Math.abs(best[1]-w)>THRESHOLD||Math.abs(best[2]-wall)>THRESHOLD;
+  return{wt:best[best.length-1],poorMatch,matchDesc:type==='round'?`${best[0]}" OD × ${best[1]}" wall`:`${best[0]}"×${best[1]}" × ${best[2]}" wall`};
+}
+function angleLookup(leg1,leg2,thick){
+  const h=Math.max(leg1,leg2),w=Math.min(leg1,leg2);
+  let best=null,bestScore=Infinity;
+  for(const row of ANGLE){
+    const rh=Math.max(row[0],row[1]),rw=Math.min(row[0],row[1]);
+    const score=Math.abs(rh-h)+Math.abs(rw-w)+Math.abs(row[2]-thick);
+    if(score<bestScore){bestScore=score;best=row;}
+  }
+  if(!best) return null;
+  return{wt:best[3],poorMatch:bestScore>0.5,matchDesc:`${best[0]}×${best[1]}×${best[2]}"`};
+}
+function priceItem(item){
+  if(item.manualPrice!==''&&item.manualPrice!==null&&!isNaN(parseFloat(item.manualPrice)))
+    return{unitPrice:parseFloat(item.manualPrice),weightLbs:null,flags:['Manual $'],warn:false};
+  if(item.type==='flat'){
+    const lkp=hrsLookup(item.thickness);
+    const w=resolveLength(item.width,item.widthUnit||'in');
+    const l=resolveLength(item.length,item.lengthUnit||'in');
+    if(!lkp||w===null||l===null) return{unitPrice:0,weightLbs:0,flags:['Incomplete'],warn:true};
+    const sqFt=(w*l)/144;
+    const weightLbs=lkp.wtPerSqFt*sqFt;
+    let price=weightLbs*CONFIG.materialRate;
+    const flags=[];
+    if(price<CONFIG.flatMinPrice){price=CONFIG.flatMinPrice;flags.push('Min $'+CONFIG.flatMinPrice);}
+    return{unitPrice:price,weightLbs,flags,warn:false};
+  }
+  if(item.type==='tube'){
+    const tt=item.tubeType||'square';
+    const h=parseFraction(item.dim1),w=parseFraction(item.dim2),wall=parseFraction(item.wall);
+    const lenIn=resolveLength(item.tubeLength,item.tubeLengthUnit||'mm');
+    if(h===null||wall===null||lenIn===null) return{unitPrice:0,weightLbs:0,flags:['Incomplete'],warn:true};
+    if(tt==='round'&&h>CONFIG.roundTubePromptOD) return{unitPrice:0,weightLbs:0,flags:['⚠ Manual Required (Round OD>'+CONFIG.roundTubePromptOD+'")'],warn:true};
+    const lookup=tubeLookup(tt,h,w||h,wall);
+    if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
+    const{wt:wtPerFt,poorMatch,matchDesc}=lookup;
+    const weightLbs=wtPerFt*(lenIn/12);
+    let price=weightLbs*CONFIG.tubeMaterialRate;
+    const flags=[];
+    if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
+    if(price<CONFIG.tubeMinPrice){price=CONFIG.tubeMinPrice;flags.push('Min $'+CONFIG.tubeMinPrice);}
+    return{unitPrice:price,weightLbs,flags,warn:poorMatch};
+  }
+  if(item.type==='angle'){
+    const leg1=parseFraction(item.angleLeg1),leg2=parseFraction(item.angleLeg2)||parseFraction(item.angleLeg1);
+    const thick=parseFraction(item.angleThick);
+    const lenIn=resolveLength(item.angleLength,item.angleLengthUnit||'mm');
+    if(leg1===null||thick===null||lenIn===null) return{unitPrice:0,weightLbs:0,flags:['Incomplete'],warn:true};
+    const lookup=angleLookup(leg1,leg2,thick);
+    if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
+    const{wt:wtPerFt,poorMatch,matchDesc}=lookup;
+    const weightLbs=wtPerFt*(lenIn/12);
+    let price=weightLbs*CONFIG.angleMaterialRate;
+    const flags=[];
+    if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
+    if(price<CONFIG.angleMinPrice){price=CONFIG.angleMinPrice;flags.push('Min $'+CONFIG.angleMinPrice);}
+    return{unitPrice:price,weightLbs,flags,warn:poorMatch};
+  }
+  if(item.type==='cchannel'){
+    const lenIn=resolveLength(item.cLength,item.cLengthUnit||'mm');
+    if(lenIn===null) return{unitPrice:0,weightLbs:0,flags:['Incomplete — need length'],warn:true};
+    // Direct lb/ft entry takes priority over lookup
+    const directLbFt=item.cUseLbFt ? parseFloat(item.cLbFt) : NaN;
+    let wtPerFt, poorMatch=false, matchDesc='';
+    if(!isNaN(directLbFt)&&directLbFt>0){
+      wtPerFt=directLbFt;
+      matchDesc='Direct lb/ft';
+    } else {
+      const depth=parseFraction(item.cDepth);
+      if(depth===null) return{unitPrice:0,weightLbs:0,flags:['Enter depth or lb/ft'],warn:true};
+      const flange=parseFraction(item.cFlange)||0, wall=parseFraction(item.cWall)||0;
+      const lookup=cChannelLookup(depth,flange,wall);
+      if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
+      wtPerFt=lookup.wt; poorMatch=lookup.poorMatch; matchDesc=lookup.matchDesc;
+    }
+    const weightLbs=wtPerFt*(lenIn/12);
+    let price=weightLbs*(CONFIG.channelRate??CONFIG.tubeMaterialRate);
+    const flags=[];
+    if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
+    if(price<CONFIG.tubeMinPrice){price=CONFIG.tubeMinPrice;flags.push('Min $'+CONFIG.tubeMinPrice);}
+    return{unitPrice:price,weightLbs,flags,warn:poorMatch};
+  }
+  return{unitPrice:0,weightLbs:0,flags:[],warn:false};
+}
+function fmt(n){return '$'+(parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtWt(n){return(parseFloat(n)||0).toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function thicknessDropdown(itemId,currentVal){
+  const opts=THICKNESS_OPTIONS.map(o=>`<option value="${o.val}"${o.val===currentVal?' selected':''}>${o.label}</option>`).join('');
+  return`<select data-id="${itemId}" data-field="thickness" style="width:114px"><option value="">— Thickness —</option>${opts}</select>`;
+}
+
+// ============================================================
+// APP STATE
+// ============================================================
+let currentUser,currentProfile;
+let quotes=[],currentQuoteId=null;
+let details=[],activeDetailIdx=0,quoteLevelItems=[];
+let filterStatus='all',authMode='signin';
+let saveTimer=null,nextLocalId=1;
+
+// ============================================================
+// INIT
+// ============================================================
+window.addEventListener('load',async()=>{
+  // Clear stale token from URL
+  if(window.location.hash&&window.location.hash.includes('access_token')){
+    // Extract token from URL for magic link login
+    const params=new URLSearchParams(window.location.hash.slice(1));
+    const accessToken=params.get('access_token');
+    const refreshToken=params.get('refresh_token');
+    const expiresIn=parseInt(params.get('expires_in')||'3600');
+    if(accessToken){
+      saveTokens(accessToken, refreshToken, expiresIn);
+    }
+    window.history.replaceState(null,'',window.location.pathname);
+  }
+
+  // Try to restore session from localStorage
+  const hasSession = loadTokens();
+  if(hasSession){
+    // Verify token is still valid by fetching profile
+    try {
+      const{data:{session}}=await sbAuth.getSession();
+      if(session){
+        // Get user info
+        const userData = await sbFetch('/auth/v1/user').catch(()=>null);
+        if(userData && userData.id){
+          currentUser = userData;
+          await loadProfile(userData);
+          showApp();
+          return;
+        }
+      }
+    } catch(e) {
+      console.warn('Session restore failed:', e.message);
+    }
+    clearTokens();
+  }
+  showLogin();
+});
+async function loadProfile(user){
+  currentUser=user;
+  try {
+    const{data}=await sbDB.from('profiles').select('*').eq('id',user.id).single();
+    currentProfile=data;
+  } catch(e) {
+    console.warn('loadProfile failed:', e.message);
+    currentProfile=null;
+  }
+}
+
+// ============================================================
+// AUTH
+// ============================================================
+function showLogin(){
+  document.getElementById('loader').style.display='none';
+  document.getElementById('login-screen').classList.add('show');
+  document.getElementById('app').classList.remove('visible');
+}
+function showApp(){
+  document.getElementById('loader').style.display='none';
+  document.getElementById('login-screen').classList.remove('show');
+  document.getElementById('app').classList.add('visible');
+  document.getElementById('topbar-name').textContent=currentProfile?.full_name||currentUser.email;
+  const rb=document.getElementById('topbar-role-badge');
+  rb.textContent=currentProfile?.role||'estimator';
+  rb.className='role-badge role-'+(currentProfile?.role||'estimator');
+  if(currentProfile?.role==='admin') document.getElementById('filter-tabs').style.display='flex';
+  if(currentProfile?.role==='admin') document.getElementById('shop-nav-btn').style.display='inline-flex';
+  loadQuotes();
+  // Keepalive removed — sessionStorage handles per-tab sessions cleanly
+}
+function toggleAuthMode(){
+  authMode=authMode==='signin'?'signup':'signin';
+  const s=authMode==='signup';
+  document.getElementById('login-title').textContent=s?'Create account':'Sign in';
+  document.getElementById('login-sub').textContent=s?'Join your team on AWF Quotes':'Troy, MI — allweldfab.com';
+  document.getElementById('login-btn').textContent=s?'Create account':'Sign in';
+  document.getElementById('login-name-field').style.display=s?'block':'none';
+  document.getElementById('login-toggle-text').textContent=s?'Already have an account?':"Don't have an account?";
+  document.getElementById('login-toggle-link').textContent=s?'Sign in':'Create account';
+  document.getElementById('login-err').textContent='';
+}
+async function forgotPassword(){
+  const email=document.getElementById('login-email').value.trim();
+  if(!email){document.getElementById('login-err').textContent='Enter your email first.';return;}
+  const{error}=await sbAuth.resetPasswordForEmail(email,{
+    redirectTo:'https://quotes.allweldfab.com'
+  });
+  if(error){document.getElementById('login-err').textContent=error.message;return;}
+  document.getElementById('login-err').style.color='var(--green)';
+  document.getElementById('login-err').textContent='Reset email sent — check your inbox.';
+}
+async function doAuth(){
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  const name=document.getElementById('login-name').value.trim();
+  const errEl=document.getElementById('login-err');
+  errEl.textContent='';
+  if(!email||!pass){errEl.textContent='Email and password required.';return;}
+  document.getElementById('login-btn').disabled=true;
+  document.getElementById('login-btn').textContent='Signing in…';
+  let res;
+  if(authMode==='signup') res=await sbAuth.signUp({email,password:pass,options:{data:{full_name:name}}});
+  else res=await sbAuth.signInWithPassword({email,password:pass});
+  if(res.error){
+    errEl.textContent=res.error.message;
+    document.getElementById('login-btn').disabled=false;
+    document.getElementById('login-btn').textContent=authMode==='signup'?'Create account':'Sign in';
+    return;
+  }
+  if(res.data?.user){
+    currentUser=res.data.user;
+    await loadProfile(res.data.user);
+    showApp();
+  }
+  document.getElementById('login-btn').disabled=false;
+}
+async function signOut(){
+  try{ await sbAuth.signOut(); }catch(e){}
+  clearTokens();
+  currentUser=null; currentProfile=null;
+  window.location.href=window.location.pathname;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').classList.contains('show')) doAuth();});
+
+// ============================================================
+// QUOTES — LOAD / SIDEBAR
+// ============================================================
+let currentSortOrder='updated_at.desc';
+async function setSortOrder(val){ currentSortOrder=val; loadQuotes(); }
+async function loadQuotes(){
+  const[col,dir]=currentSortOrder.split('.');
+  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,user_id,review_note,submitted_at,won,po_number,due_date').order(col,{ascending:dir==='asc',nullsFirst:false});
+  if(filterStatus==='won') q=q.eq('won',true);
+  else if(filterStatus!=='all') {
+    q=q.eq('status',filterStatus);
+    if(filterStatus==='sent') q=q.eq('won',false);
+  }
+  const{data,error}=await q;
+  if(error){toast('Error loading quotes','err');return;}
+  quotes=data||[];
+  renderSidebar();
+}
+function renderSidebar(){
+  const list=document.getElementById('quote-list');
+  const term=(document.getElementById('sidebar-search')?.value||'').toLowerCase().trim();
+  let filtered=quotes;
+  if(term){
+    filtered=quotes.filter(q=>{
+      return (q.customer_name||'').toLowerCase().includes(term)
+          || String(q.number||'').includes(term)
+          || (q.customer_quote_num||'').toLowerCase().includes(term)
+          || (q.po_number||'').toLowerCase().includes(term);
+    });
+  }
+  if(!filtered.length){
+    list.innerHTML=`<div style="padding:14px 10px;font-size:12px;color:var(--text3)">${term?'No matching quotes.':'No quotes yet.'}</div>`;
+    return;
+  }
+  list.innerHTML=filtered.map(q=>`
+    <div class="quote-item${q.id===currentQuoteId?' active':''}" onclick="openQuote('${q.id}')">
+      <div class="qi-num">#${q.number}${q.customer_quote_num ? ` <span style="font-size:9px;color:var(--text3)">${q.customer_quote_num}</span>` : ``}${q.po_number?` <span style="font-size:9px;color:var(--text3);font-family:var(--font)">${q.po_number}</span>`:''}</div>
+      <div class="qi-customer">${q.customer_name||'No customer'}</div>
+      <div class="qi-meta">
+        <span><span class="sdot sdot-${q.status}"></span>${q.status}${q.won?' ✓ Won':''}</span>
+        <span>${fmt(q.total_price||0)}</span>
+      </div>
+    </div>`).join('');
+}
+async function setFilter(f,el){
+  filterStatus=f;
+  document.querySelectorAll('.filter-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  loadQuotes();
+}
+
+// ============================================================
+// OPEN / NEW QUOTE
+// ============================================================
+async function openQuote(id){
+  currentQuoteId=id;
+  // Always fetch fresh from DB to get all columns including new ones
+  const{data:freshQ}=await sbDB.from('quotes').select('*').eq('id',id).single();
+  const q=freshQ||quotes.find(x=>x.id===id);
+  if(freshQ){const idx=quotes.findIndex(x=>x.id===id);if(idx>=0)quotes[idx]=freshQ;}
+  // Load line items and restore details structure
+  const{data:items}=await sbDB.from('line_items').select('*').eq('quote_id',id).order('sort_order');
+  // Rebuild details from item_data
+  const rawItems=items||[];
+  // Reset both before rebuilding — prevents accumulation on re-open
+  quoteLevelItems=[];
+  // Group by detail_idx stored in item_data
+  const detailMap={};
+  rawItems.forEach(row=>{
+    const di=(row.item_data&&row.item_data.detail_idx!==undefined)?row.item_data.detail_idx:0;
+    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''};
+    const d=detailMap[di];
+    if(row.item_type==='detail_meta'){
+      d.name=row.description||'';
+      d.miters=row.item_data.miters||0;
+      d.holes=row.item_data.holes||0;
+      d.adjustment=row.item_data.adjustment||0;
+      d.quantity=row.item_data.quantity||1;
+      d.notes=row.item_data.notes||'';
+    } else if(row.item_type==='quote_level'){
+      quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
+    } else if(row.item_type==='other'){
+      d.otherItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||''});
+    } else {
+      // Material item
+      const idata=row.item_data||{};
+      d.items.push({id:nextLocalId++,dbId:row.id,type:row.item_type,qty:row.qty||1,manualPrice:idata.manualPrice||'',
+        thickness:idata.thickness||'',width:idata.width||'',length:idata.length||'',lengthUnit:idata.lengthUnit||'in',widthUnit:idata.widthUnit||'in',
+        dim1:idata.dim1||'',dim2:idata.dim2||'',wall:idata.wall||'',tubeLength:idata.tubeLength||'',tubeLengthUnit:idata.tubeLengthUnit||'mm',tubeType:idata.tubeType||'square',
+        angleLeg1:idata.angleLeg1||'',angleLeg2:idata.angleLeg2||'',angleThick:idata.angleThick||'',angleLength:idata.angleLength||'',angleLengthUnit:idata.angleLengthUnit||'mm',
+        cDepth:idata.cDepth||'',cFlange:idata.cFlange||'',cWall:idata.cWall||'',cLength:idata.cLength||'',cLengthUnit:idata.cLengthUnit||'mm',cLbFt:idata.cLbFt||'',cUseLbFt:!!idata.cUseLbFt});
+    }
+  });
+  details=Object.values(detailMap);
+  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''}];
+  activeDetailIdx=0;
+  renderQuoteEditor(q);
+  renderSidebar();
+}
+async function newQuote(){
+  const{data,error}=await sbDB.from('quotes').insert({user_id:currentProfile.id,status:'draft'}).select().single();
+  if(error){toast('Could not create quote','err');return;}
+  quotes.unshift(data);
+  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''}];
+  quoteLevelItems=[];
+  activeDetailIdx=0;
+  currentQuoteId=data.id;
+  renderSidebar();
+  renderQuoteEditor(data);
+}
+
+// ============================================================
+// RENDER QUOTE EDITOR
+// ============================================================
+function renderQuoteEditor(q){
+  const isAdmin=currentProfile?.role==='admin';
+  const isOwner=q.user_id===currentProfile?.id;
+  const locked=q.status!=='draft'&&q.status!=='rejected'&&!isAdmin;
+  const lc=locked?'locked':'';
+
+  const statusBadge=`<span class="status-badge badge-${q.status}">${q.status}</span>`;
+
+  let banner='';
+  if(q.status==='submitted'){
+    banner=`<div class="review-banner submitted">⏳ Awaiting admin review
+      ${isAdmin?`<button class="btn btn-sm btn-accent" style="margin-left:auto" onclick="openReviewPanel()">Review</button>`:''}
+    </div>`;
+  } else if(q.status==='rejected'){
+    banner=`<div class="review-banner rejected">✗ Rejected${q.review_note?': '+esc(q.review_note):''}
+      ${(isOwner||isAdmin)?`<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="reopenDraft()">Edit &amp; Resubmit</button>`:''}
+    </div>`;
+  } else if(q.status==='approved'){
+    banner=`<div class="review-banner approved">✓ Approved — ready to send</div>`;
+  }
+
+  let actions='';
+  const previewBtn=`<button class="btn btn-ghost btn-sm no-print" onclick="showQuoteTab('preview')">Preview / PDF</button>`;
+  if(isAdmin){
+    actions=`${previewBtn}${q.status!=='draft'?`<button class="btn btn-ghost btn-sm" onclick="openReviewPanel()">Review / Status</button>`:''}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button>`;
+  } else if(isOwner&&(q.status==='draft'||q.status==='rejected')){
+    actions=`${previewBtn}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button><button class="btn btn-accent btn-sm" onclick="submitForReview()">Submit for Review →</button>`;
+  } else {
+    actions=`${previewBtn}`;
+  }
+
+  document.getElementById('main-content').innerHTML=`
+  <div class="${lc}" id="quote-editor">
+    <div class="quote-hdr">
+      <div class="quote-num">#${q.number}</div>
+      ${statusBadge}
+      <span class="quote-owner-name" id="quote-owner-el"></span>
+      <div class="quote-hdr-actions">${actions}</div>
+    </div>
+    ${banner}
+    <div class="cbar">
+      <input id="field-customer" placeholder="Customer / Company" value="${esc(q.customer_name||'')}" oninput="schedSave()" ${locked?'readonly':''}>${locked?'':'<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openOdooModal()">⬇ Odoo</button>'}
+      <span class="cbar-sep">|</span>
+      <input id="field-cust-quote" placeholder="Customer Quote #" value="${esc(q.customer_quote_num||'')}" oninput="schedSave()" ${locked?'readonly':''} style="max-width:150px">
+      <span class="cbar-sep">|</span>
+      <input id="field-location" placeholder="Location / Job site" value="${esc(q.location||'')}" oninput="schedSave()" ${locked?'readonly':''} style="max-width:150px">
+      <span class="cbar-sep">|</span>
+      <input id="field-lead" type="number" min="1" placeholder="Lead wks" value="${q.lead_time_weeks||''}" oninput="schedSave()" ${locked?'readonly':''} style="max-width:80px">
+      <span class="cbar-sep">|</span>
+      <select id="field-terms" oninput="schedSave()" style="max-width:130px">
+        <option value="">Terms…</option>
+        <option${(q.terms||'')==='Net 30'?' selected':''}>Net 30</option>
+        <option${(q.terms||'')==='Net 45'?' selected':''}>Net 45</option>
+        <option${(q.terms||'')==='Net 60'?' selected':''}>Net 60</option>
+        <option${(q.terms||'')==='COD'?' selected':''}>COD</option>
+        <option${(q.terms||'')==='Due on Receipt'?' selected':''}>Due on Receipt</option>
+      </select>
+    </div>
+    <div class="quote-tab-bar no-print">
+      <button class="quote-tab active" id="tab-build" onclick="showQuoteTab('build')">Build Quote</button>
+      <button class="quote-tab" id="tab-preview" onclick="showQuoteTab('preview')">Quote Preview</button>
+      <button class="quote-tab" id="tab-pdf" onclick="showQuoteTab('pdf')" style="color:var(--teal)">⬆ PDF Import</button>
+    </div>
+    <div id="build-area">
+    <div id="detail-list-bar" class="detail-list-bar"></div>
+    <div id="detail-body" class="detail-body"></div>
+    <div class="ql-section">
+      <div class="ql-label">Quote-level items</div>
+      <div class="bom-wrap"><table class="bom"><thead><tr><th>Description</th><th style="width:52px">Qty</th><th style="width:90px">Unit $</th><th class="price-cell">Total</th><th style="width:26px"></th></tr></thead><tbody id="ql-body"></tbody></table></div>
+      ${locked?'':` <div class="row-btns"><button class="add-item-btn" onclick="addQLItem()">+ Freight / Fee</button></div>`}
+    </div>
+    <div class="notes-section">
+      <label>Notes</label>
+      <textarea id="field-notes" oninput="schedSave()" ${locked?'readonly':''}>${esc(q.notes||'')}</textarea>
+    </div>
+    </div><!-- /build-area -->
+    <div id="pdf-import-area" style="display:none;">
+      <div style="padding:32px;max-width:760px;margin:0 auto;">
+        <div id="pdf-drop-zone"
+          style="border:3px dashed var(--border2);border-radius:12px;padding:60px 32px;text-align:center;cursor:pointer;transition:all .2s;"
+          ondragenter="event.preventDefault();event.stopPropagation();this.style.borderColor='var(--teal)';this.style.background='rgba(45,212,191,.05)'"
+          ondragover="event.preventDefault();event.stopPropagation()"
+          ondragleave="event.stopPropagation();this.style.borderColor='';this.style.background=''"
+          ondrop="event.preventDefault();event.stopPropagation();handlePdfDrop(event)"
+          onclick="document.getElementById('pdf-file-input').click()">
+          <div style="font-size:52px;margin-bottom:14px;pointer-events:none">📄📄📄</div>
+          <div style="font-size:18px;font-weight:500;color:var(--text);margin-bottom:6px;pointer-events:none">Drop PDF drawings here</div>
+          <div style="font-size:13px;color:var(--text2);margin-bottom:20px;pointer-events:none">Multiple files OK — each PDF becomes a separate detail</div>
+          <div style="display:inline-block;padding:10px 28px;background:var(--teal-dim);color:var(--teal);border-radius:6px;font-size:14px;font-weight:500;pointer-events:none">Choose PDF Files</div>
+          <input type="file" id="pdf-file-input" accept=".pdf" multiple style="display:none" onchange="handlePdfFiles(this.files)">
+        </div>
+        <div id="pdf-processing" style="display:none;margin-top:20px;">
+          <div style="font-family:var(--font);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);margin-bottom:10px;">Processing files</div>
+          <div id="pdf-file-statuses"></div>
+        </div>
+        <div id="pdf-preview" style="display:none;margin-top:20px;">
+          <div style="font-family:var(--font);font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);margin-bottom:12px;">Review extracted details</div>
+          <div id="pdf-details-preview"></div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:16px;">
+            <span id="pdf-summary" style="font-size:13px;color:var(--text2);font-family:var(--font);flex:1;"></span>
+            <button class="btn btn-ghost btn-sm" onclick="resetPdfImport()">← Start Over</button>
+            <button class="btn btn-accent" id="pdf-import-btn" onclick="confirmPdfImport()" style="display:none;">Import All Details →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="print-area">
+      <div class="print-toolbar no-print">
+        <button class="btn btn-accent btn-sm" onclick="printQuote()">⬇ Download / Print PDF</button>
+        <button class="btn btn-ghost btn-sm" onclick="showQuoteTab('build')">← Back to Edit</button>
+        <span style="font-size:11px;color:var(--text2);margin-left:8px">Tip: Use browser Print → Save as PDF</span>
+      </div>
+      <div class="print-preview-wrap">
+        <div class="quote-print" id="quote-print-area"></div>
+      </div>
+    </div>
+    <div class="grand-total-bar no-print" id="action-footer-bar">
+      <div class="action-footer" id="workflow-actions"></div>
+      <div style="display:flex;align-items:center;gap:16px;">
+        <span class="gt-label">Quote Total</span>
+        <span class="gt-value" id="grand-total-display">${fmt(0)}</span>
+      </div>
+    </div>
+  </div>`;
+
+  if(isAdmin&&q.user_id){
+    sbDB.from('profiles').select('full_name,email').eq('id',q.user_id).single().then(({data})=>{
+      const el=document.getElementById('quote-owner-el');
+      if(el&&data) el.textContent='by '+(data.full_name||data.email);
+    });
+  }
+
+  renderDetailBar(locked);
+  renderDetailBody(locked);
+  renderQLTable(locked);
+  recalcGrandTotal();
+  renderWorkflowActions(q, isAdmin, isOwner, locked);
+
+  // Event delegation for bom inputs
+  document.getElementById('quote-editor').addEventListener('input',handleBomInput);
+  document.getElementById('quote-editor').addEventListener('change',handleBomChange);
+  document.getElementById('quote-editor').addEventListener('blur',handleBomChange,true);
+  document.getElementById('quote-editor').addEventListener('keydown',handleBomTab);
+}
+
+// ============================================================
+// DETAILS
+// ============================================================
+function renderDetailBar(locked){
+  const bar=document.getElementById('detail-list-bar');
+  if(!bar) return;
+  let html=details.map((d,i)=>{
+    const{total}=calcDetailTotal(d);
+    return`<button class="detail-pill${i===activeDetailIdx?' active':''}" onclick="selectDetail(${i})">${esc(d.name)||'Detail '+(i+1)} <span style="font-size:10px;opacity:.7">${fmt(total)}</span></button>`;
+  }).join('');
+  if(!locked) html+=`<button class="add-detail-btn" onclick="addDetail()">+ Detail</button>`;
+  bar.innerHTML=html;
+}
+
+function renderDetailBody(locked){
+  const body=document.getElementById('detail-body');
+  if(!body||!details.length) return;
+  const d=details[activeDetailIdx];
+  const T=calcDetailTotal(d);
+
+  const bomRows=d.items.map(item=>{
+    const{unitPrice,weightLbs,flags,warn}=priceItem(item);
+    const qty=parseInt(item.qty)||1;
+    const tt=item.tubeType||'square',isRound=tt==='round';
+    const tlu=item.tubeLengthUnit||'mm',lu=item.lengthUnit||'in',wu=item.widthUnit||'in';
+    let dims='';
+    if(item.type==='angle'){
+      const alu=item.angleLengthUnit||'mm';
+      dims=`<input type="text" data-id="${item.id}" data-field="angleLeg1" value="${esc(item.angleLeg1)}" placeholder="Leg1" style="width:40px">
+        × <input type="text" data-id="${item.id}" data-field="angleLeg2" value="${esc(item.angleLeg2)}" placeholder="Leg2" style="width:40px">
+        t<input type="text" data-id="${item.id}" data-field="angleThick" value="${esc(item.angleThick)}" placeholder="Thk" style="width:40px">
+        × <input type="text" data-id="${item.id}" data-field="angleLength" value="${esc(item.angleLength)}" placeholder="L" style="width:58px">
+        <button tabindex="-1" class="mm-toggle${alu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'angleLengthUnit')">${alu.toUpperCase()}</button>`;
+    } else if(item.type==='flat'){
+      dims=`${thicknessDropdown(item.id,item.thickness)}
+        × <input type="text" data-id="${item.id}" data-field="width" value="${esc(item.width)}" placeholder="W" style="width:48px">
+        <button tabindex="-1" class="mm-toggle${wu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'widthUnit')">${wu.toUpperCase()}</button>
+        × <input type="text" data-id="${item.id}" data-field="length" value="${esc(item.length)}" placeholder="L" style="width:48px">
+        <button tabindex="-1" class="mm-toggle${lu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'lengthUnit')">${lu.toUpperCase()}</button>`;
+    } else if(item.type==='cchannel'){
+      const clu=item.cLengthUnit||'mm';
+      const hasLbFt=!!item.cUseLbFt;
+      dims=`<button tabindex="-1" class="mm-toggle${hasLbFt?' active':''}" onclick="toggleCChannelMode(${item.id})" style="margin-right:4px" title="Toggle lb/ft or dims entry">${hasLbFt?'lb/ft':'dims'}</button>${hasLbFt
+        ? `<input type="text" data-id="${item.id}" data-field="cLbFt" value="${esc(item.cLbFt||'')}" placeholder="lb/ft e.g. 18.75" style="width:90px">`
+        : `D<input type="text" data-id="${item.id}" data-field="cDepth" value="${esc(item.cDepth||'')}" placeholder="Depth" style="width:40px">
+        F<input type="text" data-id="${item.id}" data-field="cFlange" value="${esc(item.cFlange||'')}" placeholder="Flng" style="width:36px">
+        w<input type="text" data-id="${item.id}" data-field="cWall" value="${esc(item.cWall||'')}" placeholder="Web" style="width:36px">`}
+        × <input type="text" data-id="${item.id}" data-field="cLength" value="${esc(item.cLength||'')}" placeholder="L" style="width:54px">
+        <button tabindex="-1" class="mm-toggle${clu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'cLengthUnit')">${clu.toUpperCase()}</button>`;
+    } else {
+      dims=`<select data-id="${item.id}" data-field="tubeType" style="width:56px">
+          <option value="square"${tt==='square'?' selected':''}>Sq</option>
+          <option value="rect"${tt==='rect'?' selected':''}>Rect</option>
+          <option value="round"${tt==='round'?' selected':''}>Rnd</option>
+        </select>
+        <input type="text" data-id="${item.id}" data-field="dim1" value="${esc(item.dim1)}" placeholder="${isRound?'OD':'H'}" style="width:40px">
+        ${!isRound?`× <input type="text" data-id="${item.id}" data-field="dim2" value="${esc(item.dim2)}" placeholder="W" style="width:40px">`:''}
+        w<input type="text" data-id="${item.id}" data-field="wall" value="${esc(item.wall)}" placeholder="Wall" style="width:40px">
+        × <input type="text" data-id="${item.id}" data-field="tubeLength" value="${esc(item.tubeLength)}" placeholder="L" style="width:58px">
+        <button tabindex="-1" class="mm-toggle${tlu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'tubeLengthUnit')">${tlu.toUpperCase()}</button>`;
+    }
+    const rowStyle = item.parseError ? 'background:var(--red-dim);' : '';
+    return`<tr style="${rowStyle}">
+      <td><select data-id="${item.id}" data-field="type" style="width:76px">
+        <option value="flat"${item.type==='flat'?' selected':''}>Flat/Plate</option>
+        <option value="tube"${item.type==='tube'?' selected':''}>Tube</option>
+        <option value="angle"${item.type==='angle'?' selected':''}>Angle</option>
+        <option value="cchannel"${item.type==='cchannel'?' selected':''}>C Channel</option>
+      </select></td>
+      <td style="white-space:nowrap">${dims}
+        <span id="fl-${item.id}" class="${warn?'flag-warn':'flag-info'}">${flags.join(', ')}</span>
+      </td>
+      <td><input type="number" data-id="${item.id}" data-field="qty" value="${item.qty}" min="1" style="width:42px"></td>
+      <td><input type="text" data-id="${item.id}" data-field="manualPrice" value="${esc(item.manualPrice)}" placeholder="Override" style="width:68px"></td>
+      <td class="wt-cell" id="wt-${item.id}">${weightLbs!==null?fmtWt(weightLbs*qty):'—'}</td>
+      <td class="price-cell${warn?' warn':''}" id="up-${item.id}">${fmt(unitPrice)}</td>
+      <td class="price-cell${warn?' warn':''}" id="lt-${item.id}">${fmt(unitPrice*qty)}</td>
+      <td>${locked?'':` <button class="btn-icon" onclick="removeBomItem(${item.id})">✕</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  const otherRows=d.otherItems.map(o=>{
+    const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
+    return`<tr>
+      <td><input type="text" data-id="${o.id}" data-field="desc" value="${esc(o.desc)}" placeholder="Description" style="width:100%"></td>
+      <td><input type="number" data-id="${o.id}" data-field="qty" value="${o.qty}" min="1" style="width:42px"></td>
+      <td><input type="text" data-id="${o.id}" data-field="unitPrice" value="${esc(o.unitPrice)}" placeholder="$0.00" style="width:72px"></td>
+      <td class="price-cell" id="ot-${o.id}">${fmt(tot)}</td>
+      <td>${locked?'':` <button class="btn-icon" onclick="removeOtherItem(${o.id})">✕</button>`}</td>
+    </tr>`;
+  }).join('');
+
+  body.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <input value="${esc(d.name)}" placeholder="Detail name…" style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;font-weight:500;padding:2px 6px;outline:none;width:200px;"
+        oninput="details[${activeDetailIdx}].name=this.value;renderDetailBar(${locked})" onfocus="this.style.borderBottomColor='var(--amber)'" onblur="this.style.borderBottomColor='var(--border)'">
+      ${!locked&&details.length>1?`<button class="btn btn-danger btn-sm" onclick="removeDetail(${activeDetailIdx})">Remove Detail</button>`:''}
+    </div>
+    <div class="bom-wrap">
+      <table class="bom">
+        <thead><tr><th style="width:80px">Type</th><th>Dimensions</th><th style="width:48px">Qty</th><th style="width:72px">Manual $</th><th class="wt-cell">~Wt</th><th class="price-cell">Unit $</th><th class="price-cell">Line Total</th><th style="width:26px"></th></tr></thead>
+        <tbody>${bomRows}</tbody>
+      </table>
+    </div>
+    ${locked?'':` <div class="row-btns">
+      <button class="add-item-btn" onclick="addBomItem('flat')">+ Flat/Plate</button>
+      <button class="add-item-btn" onclick="addBomItem('tube')">+ Tube</button>
+      <button class="add-item-btn" onclick="addBomItem('angle')">+ Angle</button>
+      <button class="add-item-btn" onclick="addBomItem('cchannel')">+ C Channel</button>
+    </div>`}
+    <div class="divider"></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px;">
+      <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">MITERS @ $15</label><br>
+        <input type="number" min="0" value="${d.miters||0}" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].miters=this.value;recalcDetailDisplay()"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">HOLES @ $15</label><br>
+        <input type="number" min="0" value="${d.holes||0}" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].holes=this.value;recalcDetailDisplay()"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">ADJ %</label><br>
+        <input type="number" value="${d.adjustment||0}" step="0.5" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].adjustment=this.value;recalcDetailDisplay()"></div>
+      <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">QTY OF DETAIL</label><br>
+        <input type="number" value="${d.quantity||1}" min="1" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].quantity=this.value;recalcDetailDisplay()"></div>
+    </div>
+    ${d.otherItems.length||!locked?`<div class="bom-wrap"><table class="bom"><thead><tr><th>Other items</th><th style="width:48px">Qty</th><th style="width:82px">Unit $</th><th class="price-cell">Total</th><th style="width:26px"></th></tr></thead><tbody>${otherRows}</tbody></table></div>
+    ${locked?'':` <div class="row-btns"><button class="add-item-btn" onclick="addOtherItem()">+ Freeform Item</button></div>`}`:''}
+    <div class="detail-totals" id="detail-totals-block">${buildTotalsHTML(d,T)}</div>`;
+}
+
+function buildTotalsHTML(d,T){
+  return`<div class="detail-totals-grid">
+    <div class="total-item"><div class="total-item-label">Material</div><div class="total-item-value">${fmt(T.matTotal)}</div></div>
+    <div class="total-item"><div class="total-item-label">Miters (${d.miters||0})</div><div class="total-item-value">${fmt(T.miterCost)}</div></div>
+    <div class="total-item"><div class="total-item-label">Holes (${d.holes||0})</div><div class="total-item-value">${fmt(T.holeCost)}</div></div>
+    <div class="total-item"><div class="total-item-label">Other</div><div class="total-item-value">${fmt(T.otherTotal)}</div></div>
+    <div class="total-item"><div class="total-item-label">Subtotal</div><div class="total-item-value">${fmt(T.adjusted)}</div></div>
+    <div class="total-item"><div class="total-item-label">× ${T.qty} Detail(s)</div><div class="total-item-value big">${fmt(T.total)}</div></div>
+    <div class="total-item"><div class="total-item-label">~Weight</div><div class="total-item-value wt">${fmtWt(T.totalWeight*T.qty)} lbs</div></div>
+  </div>`;
+}
+
+// ============================================================
+// CALC
+// ============================================================
+function calcDetailTotal(d){
+  let matTotal=0,totalWeight=0;
+  for(const item of d.items){
+    const{unitPrice,weightLbs}=priceItem(item);
+    const qty=parseInt(item.qty)||1;
+    matTotal+=unitPrice*qty;
+    if(weightLbs!==null) totalWeight+=weightLbs*qty;
+  }
+  const miterCost=(parseInt(d.miters)||0)*15;
+  const holeCost=(parseInt(d.holes)||0)*15;
+  let otherTotal=0;
+  for(const o of d.otherItems) otherTotal+=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
+  const subtotal=matTotal+miterCost+holeCost+otherTotal;
+  const adj=parseFloat(d.adjustment)||0;
+  const adjusted=subtotal*(1+adj/100);
+  const qty=parseInt(d.quantity)||1;
+  return{matTotal,miterCost,holeCost,otherTotal,subtotal,adjusted,total:adjusted*qty,qty,totalWeight};
+}
+function calcGrandTotal(){
+  let t=0;
+  for(const d of details) t+=calcDetailTotal(d).total;
+  for(const q of quoteLevelItems) t+=(parseFloat(q.unitPrice)||0)*(parseInt(q.qty)||1);
+  return t;
+}
+function recalcGrandTotal(){
+  const el=document.getElementById('grand-total-display');
+  if(el) el.textContent=fmt(calcGrandTotal());
+}
+function recalcDetailDisplay(){
+  const d=details[activeDetailIdx];if(!d) return;
+  const T=calcDetailTotal(d);
+  const el=document.getElementById('detail-totals-block');
+  if(el) el.innerHTML=buildTotalsHTML(d,T);
+  d.items.forEach(item=>{
+    const{unitPrice,weightLbs,flags,warn}=priceItem(item);
+    const qty=parseInt(item.qty)||1;
+    const uc=document.getElementById('up-'+item.id);
+    const lc=document.getElementById('lt-'+item.id);
+    const wc=document.getElementById('wt-'+item.id);
+    const fc=document.getElementById('fl-'+item.id);
+    if(uc){uc.textContent=fmt(unitPrice);uc.className='price-cell'+(warn?' warn':'');}
+    if(lc){lc.textContent=fmt(unitPrice*qty);lc.className='price-cell'+(warn?' warn':'');}
+    if(wc) wc.textContent=weightLbs!==null?fmtWt(weightLbs*qty):'—';
+    if(fc){fc.textContent=flags.join(', ');fc.className=warn?'flag-warn':'flag-info';}
+  });
+  d.otherItems.forEach(o=>{
+    const el=document.getElementById('ot-'+o.id);
+    if(el) el.textContent=fmt((parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1));
+  });
+  // Update detail bar total
+  renderDetailBar(false);
+  recalcGrandTotal();
+  schedSave();
+}
+
+// ============================================================
+// ADD / REMOVE ITEMS
+// ============================================================
+function addDetail(){
+  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''});
+  activeDetailIdx=details.length-1;
+  renderDetailBar(false);renderDetailBody(false);saveItems();
+}
+function selectDetail(idx){activeDetailIdx=idx;renderDetailBar(false);renderDetailBody(false);}
+function removeDetail(idx){
+  if(details.length===1){toast('A quote needs at least one detail','err');return;}
+  details.splice(idx,1);
+  if(activeDetailIdx>=details.length) activeDetailIdx=details.length-1;
+  renderDetailBar(false);renderDetailBody(false);schedSave();
+}
+function addBomItem(type){
+  details[activeDetailIdx].items.push({id:nextLocalId++,type,qty:1,manualPrice:'',thickness:'',width:'',length:'',lengthUnit:'in',widthUnit:'in',dim1:'',dim2:'',wall:'',tubeLength:'',tubeLengthUnit:'mm',tubeType:'square',angleLeg1:'',angleLeg2:'',angleThick:'',angleLength:'',angleLengthUnit:'mm',cDepth:'',cFlange:'',cWall:'',cLength:'',cLengthUnit:'mm',cLbFt:'',cUseLbFt:false});
+  renderDetailBody(false);
+  // Save immediately so a refresh never loses a newly added row
+  saveItems();
+}
+function removeBomItem(localId){
+  details[activeDetailIdx].items=details[activeDetailIdx].items.filter(i=>i.id!==localId);
+  renderDetailBody(false);recalcDetailDisplay();saveItems();
+}
+function addOtherItem(){details[activeDetailIdx].otherItems.push({id:nextLocalId++,desc:'',qty:1,unitPrice:''});renderDetailBody(false);saveItems();}
+function removeOtherItem(localId){details[activeDetailIdx].otherItems=details[activeDetailIdx].otherItems.filter(i=>i.id!==localId);renderDetailBody(false);recalcDetailDisplay();}
+function addQLItem(){quoteLevelItems.push({id:nextLocalId++,desc:'',qty:1,unitPrice:0});renderQLTable(false);recalcGrandTotal();saveItems();}
+function removeQLItem(localId){quoteLevelItems=quoteLevelItems.filter(i=>i.id!==localId);renderQLTable(false);recalcGrandTotal();schedSave();}
+function toggleUnit(localId,field){
+  for(const d of details){const item=d.items.find(i=>i.id===localId);if(item){item[field]=item[field]==='mm'?'in':'mm';renderDetailBody(false);schedSave();return;}}
+}
+function toggleCChannelMode(localId){
+  for(const d of details){
+    const item=d.items.find(i=>i.id===localId);
+    if(item){
+      // Toggle the mode flag
+      item.cUseLbFt = !item.cUseLbFt;
+      renderDetailBody(false);schedSave();return;
+    }
+  }
+}
+
+function renderQLTable(locked){
+  const body=document.getElementById('ql-body');if(!body) return;
+  if(!quoteLevelItems.length){body.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:8px;font-size:12px">No quote-level items</td></tr>`;return;}
+  body.innerHTML=quoteLevelItems.map(q=>{
+    const tot=(parseFloat(q.unitPrice)||0)*(parseInt(q.qty)||1);
+    return`<tr>
+      <td><input type="text" data-ql="${q.id}" data-field="desc" value="${esc(q.desc)}" placeholder="e.g. Freight" style="width:100%"></td>
+      <td><input type="number" data-ql="${q.id}" data-field="qty" value="${q.qty}" min="1" style="width:42px"></td>
+      <td><input type="text" data-ql="${q.id}" data-field="unitPrice" value="${esc(q.unitPrice)}" placeholder="$0.00" style="width:72px"></td>
+      <td class="price-cell" id="ql-${q.id}">${fmt(tot)}</td>
+      <td>${locked?'':` <button class="btn-icon" onclick="removeQLItem(${q.id})">✕</button>`}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// EVENT DELEGATION
+// ============================================================
+const TAB_ORDER={flat:['thickness','width','length','qty','manualPrice'],tube:['dim1','dim2','wall','tubeLength','qty','manualPrice'],angle:['angleLeg1','angleLeg2','angleThick','angleLength','qty','manualPrice'],cchannel:['cLbFt','cDepth','cFlange','cWall','cLength','qty','manualPrice']};
+
+function handleBomInput(e){
+  const el=e.target;
+  if(el.id&&['field-customer','field-cust-quote','field-location','field-lead','field-notes'].includes(el.id)){schedSave();return;}
+  const id=el.dataset.id?parseInt(el.dataset.id):null;
+  const ql=el.dataset.ql?parseInt(el.dataset.ql):null;
+  const field=el.dataset.field;
+  if(ql&&field){
+    const qi=quoteLevelItems.find(i=>i.id===ql);
+    if(qi){qi[field]=el.value;const tot=(parseFloat(qi.unitPrice)||0)*(parseInt(qi.qty)||1);const tc=document.getElementById('ql-'+ql);if(tc)tc.textContent=fmt(tot);recalcGrandTotal();schedSave();}
+    return;
+  }
+  if(!id||!field) return;
+  for(const d of details){
+    const item=d.items.find(i=>i.id===id);
+    if(item){
+      item[field]=el.value;
+      recalcDetailDisplay();schedSave();return;
+    }
+    const oi=d.otherItems.find(i=>i.id===id);
+    if(oi){oi[field]=el.value;const el2=document.getElementById('ot-'+id);if(el2)el2.textContent=fmt((parseFloat(oi.unitPrice)||0)*(parseInt(oi.qty)||1));recalcDetailDisplay();schedSave();return;}
+  }
+}
+function handleBomChange(e){
+  const el=e.target,id=el.dataset.id?parseInt(el.dataset.id):null,field=el.dataset.field;
+  if(!id||!field) return;
+  for(const d of details){
+    const item=d.items.find(i=>i.id===id);
+    if(item){
+      item[field]=el.value;
+      if(field==='tubeType'||field==='type'){renderDetailBody(false);schedSave();return;}
+      // Auto-detect square vs rect on blur (change event) — safe, not mid-type
+      if((field==='dim1'||field==='dim2')&&item.type==='tube'&&item.tubeType!=='round'){
+        const d1=parseFloat(item.dim1),d2=parseFloat(item.dim2);
+        if(!isNaN(d1)&&!isNaN(d2)&&d2>0){
+          const auto=d1===d2?'square':'rect';
+          if(item.tubeType!==auto){item.tubeType=auto;renderDetailBody(false);schedSave();return;}
+        }
+      }
+      recalcDetailDisplay();schedSave();return;
+    }
+  }
+}
+function handleBomTab(e){
+  if(e.key!=='Tab') return;
+  const el=e.target,id=el.dataset.id?parseInt(el.dataset.id):null,field=el.dataset.field;
+  if(!id||!field) return;
+  for(const d of details){
+    const item=d.items.find(i=>i.id===id);
+    if(!item) continue;
+    const order=TAB_ORDER[item.type];if(!order) return;
+    const cur=order.indexOf(field);if(cur===-1) return;
+    const nextField=e.shiftKey?order[cur-1]:order[cur+1];if(!nextField) return;
+    const tr=el.closest('tr');if(!tr) return;
+    const next=tr.querySelector(`[data-id="${id}"][data-field="${nextField}"]`);
+    if(next){e.preventDefault();next.focus();}
+    return;
+  }
+}
+
+// ============================================================
+// WORKFLOW ACTIONS FOOTER
+// ============================================================
+function renderWorkflowActions(q, isAdmin, isOwner, locked) {
+  const el = document.getElementById('workflow-actions');
+  if (!el) return;
+  const status = q.status;
+
+  // Status pill
+  const statusColors = {draft:'var(--text3)',submitted:'var(--amber)',approved:'var(--green)',rejected:'var(--red)',sent:'var(--blue)'};
+  const statusLabels = {draft:'Draft — not yet submitted',submitted:'Pending admin review',approved:'Approved — ready to send',rejected:'Returned for revision',sent:'Sent to customer'};
+  let html = `<span style="font-size:12px;font-family:var(--font);color:${statusColors[status]||'var(--text2)'}">● ${statusLabels[status]||status}</span>`;
+
+  if (status === 'draft') {
+    html += `<span class="workflow-hint">When ready →</span>`;
+    html += `<button class="btn-submit" onclick="submitForReview()">Submit for Review →</button>`;
+  } else if (status === 'rejected') {
+    html += `<span class="workflow-hint">Make changes then resubmit →</span>`;
+    html += `<button class="btn-submit" onclick="submitForReview()">Resubmit for Review →</button>`;
+  } else if (status === 'submitted') {
+    if (isAdmin) {
+      html += `<button class="btn-submit" onclick="openReviewPanel()">Review &amp; Approve →</button>`;
+    } else {
+      html += `<span class="workflow-hint">Awaiting admin approval — no changes allowed</span>`;
+    }
+  } else if (status === 'approved') {
+    if (isAdmin) {
+      html += `<button class="btn btn-ghost btn-sm" onclick="adminDecision('sent')">Mark as Sent</button>`;
+      html += `<button class="btn btn-ghost btn-sm" onclick="openReviewPanel()">Change Status</button>`;
+    } else {
+      html += `<span class="workflow-hint">✓ Approved — admin will mark as sent</span>`;
+    }
+    html += `<button class="btn btn-ghost btn-sm" onclick="generateOrderReport()" style="border-color:var(--amber);color:var(--amber)">📋 Order Report</button>`;
+  } else if (status === 'sent') {
+    if(q.won){
+      html += `<span style="color:var(--green);font-family:var(--font);font-size:12px">✓ WON</span>`;
+    } else {
+      html += `<span class="workflow-hint">✓ Sent to customer</span>`;
+      html += `<button class="btn btn-success btn-sm" onclick="markWon()">✓ Mark as Won</button>`;
+    }
+    html += `<button class="btn btn-ghost btn-sm" onclick="generateOrderReport()" style="border-color:var(--amber);color:var(--amber)">📋 Order Report</button>`;
+    if (isAdmin) html += `<button class="btn btn-ghost btn-sm" onclick="openReviewPanel()">Change Status</button>`;
+  }
+  // Order Report available on any won quote regardless of status
+  if(q.won && status !== 'sent') {
+    html += `<button class="btn btn-ghost btn-sm" onclick="generateOrderReport()" style="border-color:var(--amber);color:var(--amber)">📋 Order Report</button>`;
+  }
+  // Admin override — Order Report accessible on any status
+  if(isAdmin && !['approved','sent'].includes(status) && !q.won) {
+    html += `<button class="btn btn-ghost btn-sm" onclick="generateOrderReport()" style="border-color:var(--border2);color:var(--text3)">📋 Order Report</button>`;
+  }
+  el.innerHTML = html;
+}
+
+// ============================================================
+// SAVE
+// ============================================================
+let saveHeaderTimer=null, saveItemsTimer=null;
+function schedSave(itemsChanged=false){
+  clearTimeout(saveHeaderTimer);
+  clearTimeout(saveItemsTimer);
+  const el=document.getElementById('save-status');if(el) el.textContent='Unsaved…';
+  // Header always saves at 800ms
+  saveHeaderTimer=setTimeout(saveHeader,800);
+  // Items always save at 1.5s — never skip, prevent data loss on refresh
+  saveItemsTimer=setTimeout(saveItems,1500);
+}
+function buildHeaderPatch(){
+  const total=calcGrandTotal();
+  const fCustomer  = document.getElementById('field-customer');
+  const fCustQuote = document.getElementById('field-cust-quote');
+  const fLocation  = document.getElementById('field-location');
+  const fLead      = document.getElementById('field-lead');
+  const fTerms     = document.getElementById('field-terms');
+  const fNotes     = document.getElementById('field-notes');
+  const patch={total_price:total};
+  if(fCustomer)  patch.customer_name      = fCustomer.value;
+  if(fCustQuote) patch.customer_quote_num = fCustQuote.value;
+  if(fLocation)  patch.location           = fLocation.value;
+  if(fLead)      patch.lead_time_weeks    = parseInt(fLead.value)||null;
+  if(fTerms)     patch.terms              = fTerms.value;
+  if(fNotes)     patch.notes              = fNotes.value;
+  return patch;
+}
+async function saveHeader(){
+  if(!currentQuoteId) return;
+  // Check session is still valid before saving
+  const{data:{session}}=await sbAuth.getSession();
+  if(!session){
+    const el=document.getElementById('save-status');
+    if(el) el.textContent='Session expired — please sign in again';
+    toast('Session expired — refreshing…','err');
+  }
+  const patch=buildHeaderPatch();
+  const{error}=await sbDB.from('quotes').update(patch).eq('id',currentQuoteId);
+  if(error){
+    const el=document.getElementById('save-status');
+    if(el) el.textContent='Save error — check connection';
+    if(error.message?.includes('JWT')||error.code===401){
+      toast('Session expired — please refresh the page','err');
+    }
+    return;
+  }
+  const qObj=quotes.find(x=>x.id===currentQuoteId);
+  if(qObj) Object.assign(qObj,patch);
+  renderSidebar();
+  const el=document.getElementById('save-status');if(el) el.textContent='Saved ✓';
+  setTimeout(()=>{const el=document.getElementById('save-status');if(el&&el.textContent==='Saved ✓') el.textContent='';},2000);
+}
+async function saveItems(){
+  if(!currentQuoteId) return;
+  const el=document.getElementById('save-status');if(el) el.textContent='Saving items…';
+  // Check session before proceeding
+  const{data:{session}}=await sbAuth.getSession();
+  if(!session){
+    if(el) el.textContent='Session expired — please sign in again';
+    toast('Session expired — please refresh the page','err');
+  }
+  // Build all rows first, THEN delete+insert atomically
+  const rows=[];let sort=0;
+  details.forEach((d,di)=>{
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes}});
+    d.items.forEach(item=>{
+      const{unitPrice}=priceItem(item);
+      const qty=parseInt(item.qty)||1;
+      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:item.type,description:'',qty,unit_price:unitPrice,total_price:+(unitPrice*qty).toFixed(2),source:'manual',item_data:{detail_idx:di,manualPrice:item.manualPrice,thickness:item.thickness,width:item.width,length:item.length,lengthUnit:item.lengthUnit,widthUnit:item.widthUnit,dim1:item.dim1,dim2:item.dim2,wall:item.wall,tubeLength:item.tubeLength,tubeLengthUnit:item.tubeLengthUnit,tubeType:item.tubeType,angleLeg1:item.angleLeg1,angleLeg2:item.angleLeg2,angleThick:item.angleThick,angleLength:item.angleLength,angleLengthUnit:item.angleLengthUnit,cDepth:item.cDepth,cFlange:item.cFlange,cWall:item.cWall,cLength:item.cLength,cLengthUnit:item.cLengthUnit,cLbFt:item.cLbFt||'',cUseLbFt:!!item.cUseLbFt}});
+    });
+    d.otherItems.forEach(o=>{
+      const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
+      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'other',description:o.desc,qty:parseInt(o.qty)||1,unit_price:parseFloat(o.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{detail_idx:di}});
+    });
+  });
+  quoteLevelItems.forEach(q=>{
+    const tot=(parseFloat(q.unitPrice)||0)*(parseInt(q.qty)||1);
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'quote_level',description:q.desc,qty:parseInt(q.qty)||1,unit_price:parseFloat(q.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{}});
+  });
+  // Only delete AFTER we have rows ready to insert
+  const{error:delErr}=await sbDB.from('line_items').delete().eq('quote_id',currentQuoteId);
+  if(delErr){if(el) el.textContent='Save error!';return;}
+  if(rows.length){
+    const{error:insErr}=await sbDB.from('line_items').insert(rows);
+    if(insErr){if(el) el.textContent='Save error! (items)';return;}
+  }
+  if(el) el.textContent='Saved ✓';
+  setTimeout(()=>{const el=document.getElementById('save-status');if(el&&el.textContent==='Saved ✓') el.textContent='';},2000);
+}
+// Full save — both header and items (used before submit)
+async function saveQuote(){
+  await saveHeader();
+  await saveItems();
+}
+
+// ============================================================
+// SUBMIT / REVIEW / APPROVE
+// ============================================================
+async function submitForReview(){
+  await saveQuote();
+  const{error}=await sbDB.from('quotes').update({status:'submitted',submitted_at:new Date().toISOString()}).eq('id',currentQuoteId);
+  if(error){toast('Error submitting','err');return;}
+  toast('Quote submitted ✓','ok');
+  await loadQuotes();
+  await openQuote(currentQuoteId);
+}
+async function reopenDraft(){
+  await sbDB.from('quotes').update({status:'draft',review_note:null}).eq('id',currentQuoteId);
+  await loadQuotes();openQuote(currentQuoteId);
+}
+function openReviewPanel(){
+  const q=quotes.find(x=>x.id===currentQuoteId);
+  const noteEl=document.getElementById('review-note');
+  const panelEl=document.getElementById('review-panel');
+  const mainEl=document.getElementById('main-content');
+  if(!panelEl){toast('Review panel not found','err');return;}
+  if(noteEl) noteEl.value=q?.review_note||'';
+  panelEl.classList.add('open');
+  if(mainEl) mainEl.style.marginRight='320px';
+}
+async function closeReviewPanel(){
+  document.getElementById('review-panel').classList.remove('open');
+  document.getElementById('main-content').style.marginRight='0';
+}
+async function adminDecision(newStatus){
+  const note=document.getElementById('review-note').value.trim();
+  const clearWon = ['sent','approved','rejected','draft'].includes(newStatus);
+  const patch = {status:newStatus,review_note:note||null,reviewed_by:currentProfile.id,reviewed_at:new Date().toISOString()};
+  if(clearWon) patch.won = false;
+  const{error}=await sbDB.from('quotes').update(patch).eq('id',currentQuoteId);
+  if(error){toast('Error','err');return;}
+  toast(`Quote ${newStatus} ✓`,'ok');
+  closeReviewPanel();
+  await loadQuotes();
+  await openQuote(currentQuoteId);
+}
+async function deleteQuote(){
+  if(!confirm('Delete this quote? Cannot be undone.')) return;
+  await sbDB.from('quotes').delete().eq('id',currentQuoteId);
+  quotes=quotes.filter(q=>q.id!==currentQuoteId);currentQuoteId=null;details=[];quoteLevelItems=[];
+  renderSidebar();
+  document.getElementById('main-content').innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><h2>No quote selected</h2></div>';
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+// ============================================================
+// CHANGE PASSWORD
+// ============================================================
+function showChangePassword(){
+  document.getElementById('pw-new').value='';
+  document.getElementById('pw-confirm').value='';
+  document.getElementById('pw-err').textContent='';
+  document.getElementById('pw-modal').classList.add('open');
+}
+async function changePassword(){
+  const errEl=document.getElementById('pw-err');
+  try{
+    const pw=document.getElementById('pw-new').value;
+    const confirm=document.getElementById('pw-confirm').value;
+    if(pw.length<6){errEl.textContent='Password must be at least 6 characters.';return;}
+    if(pw!==confirm){errEl.textContent='Passwords do not match.';return;}
+    errEl.textContent='Saving…';
+    const{data,error}=await sbAuth.updateUser({password:pw});
+    if(error){errEl.textContent=error.message;return;}
+    document.getElementById('pw-modal').classList.remove('open');
+    toast('Password updated ✓','ok');
+  }catch(e){
+    if(errEl) errEl.textContent='Error: '+e.message;
+  }
+}
+
+// ============================================================
+// WON STATUS
+// ============================================================
+
+// Convert decimal inches to nearest fractional inch string
+function decimalToFraction(decimal) {
+  if (decimal === null || isNaN(decimal)) return '';
+  const whole = Math.floor(decimal);
+  const frac = decimal - whole;
+  if (frac < 0.015) return whole ? String(whole) : '0';
+  // Find best fraction using 16ths max (no 32nds on shop floor)
+  const denominators = [2,4,8,16];
+  let bestNum=1,bestDen=2,bestErr=Infinity;
+  for (const den of denominators) {
+    // Floor to nearest (never round up — always go to lower 16th)
+    const num = Math.floor(frac * den);
+    if (num === 0 || num === den) continue;
+    const err = frac - num/den; // positive = we went lower, that's ok
+    if (err >= 0 && err < bestErr) { bestErr=err; bestNum=num; bestDen=den; }
+  }
+  const gcd=(a,b)=>b?gcd(b,a%b):a;
+  const g=gcd(bestNum,bestDen);
+  bestNum/=g; bestDen/=g;
+  const fracStr = bestDen===1 ? '' : ` ${bestNum}/${bestDen}`;
+  return whole ? `${whole}${fracStr}` : `${bestNum}/${bestDen}`;
+}
+
+function dimToFracIn(val, unit) {
+  const n = parseFraction(val);
+  if (n === null || n === 0) return val || '';
+  const inches = (unit === 'mm') ? n / 25.4 : n;
+  return decimalToFraction(inches) + '"';
+}
+
+function formatItemForReport(item) {
+  if (item.parseError) return item.parseError;
+  if (item.type === 'tube') {
+    const isRound = (item.tubeType||'square') === 'round';
+    const len = dimToFracIn(item.tubeLength, item.tubeLengthUnit||'mm');
+    if (isRound) return `RND TUBE ${dimToFracIn(item.dim1,'in')} OD x ${dimToFracIn(item.wall,'in')} W/T x ${len}`;
+    const isSq = item.tubeType==='square' || item.dim1===item.dim2 || !item.dim2;
+    if (isSq) return `SQ TUBE ${dimToFracIn(item.dim1,'in')} x ${dimToFracIn(item.wall,'in')} W/T x ${len}`;
+    return `RECT TUBE ${dimToFracIn(item.dim1,'in')} x ${dimToFracIn(item.dim2,'in')} x ${dimToFracIn(item.wall,'in')} W/T x ${len}`;
+  }
+  if (item.type === 'flat') {
+    // Handle gauge thickness - convert to fractional inches
+    let thkDisplay = '';
+    const thkStr = String(item.thickness||'').trim();
+    if (!thkStr) return 'FLAT/PLATE — MISSING THICKNESS';
+    const gaugeMatch = thkStr.match(/^(\d+)\s*ga$/i);
+    if (gaugeMatch) {
+      const ga = parseInt(gaugeMatch[1]);
+      const gaugeRow = GAUGE_TABLE[ga];
+      if (gaugeRow) {
+        thkDisplay = decimalToFraction(gaugeRow[0]) + '"';
+      } else {
+        thkDisplay = thkStr;
+      }
+    } else {
+      thkDisplay = dimToFracIn(item.thickness,'in');
+    }
+    return `PL${thkDisplay} - ${dimToFracIn(item.width,item.widthUnit||'in')} x ${dimToFracIn(item.length,item.lengthUnit||'in')}`;
+  }
+  if (item.type === 'angle') {
+    return `ANGLE ${dimToFracIn(item.angleLeg1,'in')} x ${dimToFracIn(item.angleLeg2,'in')} x ${dimToFracIn(item.angleThick,'in')} x ${dimToFracIn(item.angleLength,item.angleLengthUnit||'mm')}`;
+  }
+  if (item.type === 'cchannel') {
+    const len = dimToFracIn(item.cLength, item.cLengthUnit||'mm');
+    if (item.cUseLbFt && item.cLbFt) return `C CHANNEL ${dimToFracIn(item.cDepth,'in')} @ ${item.cLbFt} lb/ft x ${len}`;
+    return `C CHANNEL ${dimToFracIn(item.cDepth,'in')} x ${len}`;
+  }
+  return item.description || 'OTHER';
+}
+
+async function generateOrderReport() {
+  const q = quotes.find(x => x.id === currentQuoteId);
+  if (!q) { toast('No quote selected','err'); return; }
+
+  // If details haven't loaded yet, reload them first then retry
+  if (!details.length || !details.some(d => (d.items&&d.items.length)||(d.otherItems&&d.otherItems.length))) {
+    toast('Loading quote data…','');
+    await openQuote(currentQuoteId);
+    // Brief pause to let render settle
+    await new Promise(r => setTimeout(r, 300));
+  }
+
+  if (!details.length) { toast('No details found — try again','err'); return; }
+  const hasItems = details.some(d => (d.items && d.items.length > 0) || (d.otherItems && d.otherItems.length > 0));
+  if (!hasItems) { toast('No line items found in any detail','err'); return; }
+  const reportDate = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
+  const MAX_ROWS = 40;
+  let pages = '';
+
+  details.forEach((detail, di) => {
+    const detailNum = String(di+1).padStart(2,'0');
+    const allItems = detail.items || [];
+    const allOther = detail.otherItems || [];
+    // Skip details with nothing at all
+    if (!allItems.length && !allOther.length) return;
+
+    // Combine BOM items and freeform otherItems into one list
+    const combinedItems = [
+      ...allItems,
+      ...allOther.map(o => ({ ...o, _isOther: true, parseError: '' }))
+    ];
+
+    const chunks = [];
+    for (let i=0; i<combinedItems.length; i+=MAX_ROWS) chunks.push(combinedItems.slice(i,i+MAX_ROWS));
+
+    chunks.forEach((chunkItems, ci) => {
+      const pageLabel = chunks.length>1 ? ` (${ci+1}/${chunks.length})` : '';
+      let rowsHtml = '';
+      const detailQty = parseInt(detail.quantity)||1;
+      const chunkOffset = ci * MAX_ROWS;
+      chunkItems.forEach((item, itemIdx) => {
+        const sym = chunkOffset + itemIdx + 1;
+        const qty = parseInt(item.qty)||1;
+        const total = qty * detailQty;
+        const desc = item._isOther ? (item.desc || 'Other item') : formatItemForReport(item);
+        const hasError = !!item.parseError;
+        rowsHtml += `<tr style="${hasError?'background:#fff0f0;':''}">
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 4px;text-align:center;font-weight:500;">${sym}</td>
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 4px;text-align:center;">${qty}</td>
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 4px;text-align:center;font-weight:500;">${total}</td>
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 6px;${hasError?'color:#cc0000;font-style:italic;':''}">${desc}</td>
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 4px;text-align:center;"></td>
+          <td style="border-bottom:1px solid #ddd;border-right:1px solid #000;padding:3px 4px;text-align:center;"></td>
+          <td style="border-bottom:1px solid #ddd;padding:3px 4px;"></td>
+        </tr>`;
+      });
+      const blankRows = Math.min(5, MAX_ROWS - chunkItems.length);
+      for (let i=0; i<blankRows; i++) {
+        rowsHtml += `<tr><td style="border-bottom:1px solid #eee;border-right:1px solid #000;height:19px;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;"></td></tr>`;
+      }
+
+      const isLastPage = (di === details.length-1) && (ci === chunks.length-1);
+      pages += `<div class="report-page" style="width:11in;height:8.5in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;overflow:hidden;">
+        <!-- Header -->
+        <div style="display:flex;align-items:baseline;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:5px;">
+          <div style="flex:1;font-size:18pt;font-weight:bold;">All Welding and Fabricating</div>
+          <div style="display:flex;align-items:flex-start;gap:12px;">
+            <div id="qr-${detailNum}-${ci}" style="width:120px;height:120px;"></div>
+            <div style="text-align:right;"><span style="font-size:14pt;font-weight:bold;">QUOTE &nbsp; Q${q.number}</span><br><span style="font-size:8.5pt;">RFQ: ${q.customer_quote_num||'—'}</span><br><span style="font-size:7pt;color:#666;">PO: ${q.po_number||'TBD'} · Det: ${detailNum}</span></div>
+          </div>
+        </div>
+        <!-- Customer info row 1 -->
+        <table style="width:100%;border-collapse:collapse;margin-bottom:5px;font-size:8.5pt;">
+          <tr>
+            <td style="width:65px;font-weight:bold;">Customer:</td>
+            <td style="border-bottom:1px solid #000;width:200px;">${q.customer_name||''}</td>
+            <td style="width:90px;font-weight:bold;padding-left:12px;">Unit Quantity:</td>
+            <td style="border-bottom:1px solid #000;width:40px;text-align:center;">${detail.quantity||1}</td>
+            <td style="width:44px;font-weight:bold;padding-left:12px;">P.O #:</td>
+            <td style="border-bottom:1px solid #000;width:130px;font-weight:bold;">${q.po_number||''}</td>
+            <td style="width:100px;font-weight:bold;padding-left:12px;">Customer Det. #:</td>
+            <td style="border-bottom:1px solid #000;">${detailNum} — ${detail.name||''}</td>
+          </tr>
+          <tr>
+            <td style="font-weight:bold;padding-top:4px;">Quote Date:</td>
+            <td style="border-bottom:1px solid #000;padding-top:4px;">${reportDate}</td>
+            <td style="font-weight:bold;padding-left:12px;padding-top:4px;">Due Date:</td>
+            <td style="border-bottom:1px solid #000;padding-top:4px;font-weight:bold;" colspan="2">${q.due_date ? new Date(q.due_date+'T12:00:00').toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'}) : ''}</td>
+            <td style="font-weight:bold;padding-left:12px;padding-top:4px;">Rel. Date:</td>
+            <td style="font-weight:bold;padding-left:12px;padding-top:4px;">Del. to H.T. by:</td>
+            <td style="border-bottom:1px solid #000;padding-top:4px;padding-left:8px;">Log #: <strong></strong></td>
+          </tr>
+        </table>
+        <!-- Two column body: BOM left 65%, sidebar right 35% -->
+        <div style="display:flex;gap:0;border:1px solid #000;">
+          <!-- LEFT: BOM table -->
+          <div style="width:65%;border-right:1px solid #000;">
+            <table style="width:100%;border-collapse:collapse;font-size:8pt;">
+              <thead><tr style="background:#f0f0f0;">
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;width:26px;">SYM</th>
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;width:34px;">UNITS</th>
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;width:42px;">TOTAL<br>UNITS</th>
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;">Description</th>
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;width:42px;">STEEL<br>TYPE</th>
+                <th style="border-bottom:1px solid #000;border-right:1px solid #000;padding:4px;width:42px;">OPER.</th>
+                <th style="border-bottom:1px solid #000;padding:4px;width:42px;">INITIALS</th>
+              </tr></thead>
+              <tbody>${rowsHtml}</tbody>
+            </table>
+          </div>
+          <!-- RIGHT: checkboxes + notes box + operations -->
+          <div style="width:35%;display:flex;flex-direction:column;padding:8px 10px;gap:8px;">
+            <!-- Checkboxes -->
+            <div style="font-size:8.5pt;">
+              <div style="margin-bottom:4px;">☐ &nbsp;S - Stress Release</div>
+              <div style="margin-bottom:4px;">☐ &nbsp;B - Sand Blast</div>
+              <div style="margin-bottom:4px;">☐ &nbsp;P - Prime</div>
+              <div>☐ &nbsp;C - Paint Color _______________</div>
+            </div>
+            <!-- Big open Special Notes / Sketch box -->
+            <div style="border:1px solid #000;flex:1;min-height:3.8in;padding:6px;">
+              <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;">Special Notes / Sketch:</div>
+            </div>
+            <!-- Operations table -->
+            <table style="border-collapse:collapse;font-size:8pt;width:100%;">
+              <thead><tr>
+                <th style="border:1px solid #000;padding:3px 6px;text-align:left;"></th>
+                <th style="border:1px solid #000;padding:3px 6px;">BY</th>
+                <th style="border:1px solid #000;padding:3px 6px;">DATE</th>
+                <th style="border:1px solid #000;padding:3px 6px;">TIME</th>
+              </tr></thead>
+              <tbody>${['SAW','BURN','PUNCH','DRILL','FIT','INSPECT','LAYOUT','WELD'].map(op=>`<tr><td style="border:1px solid #000;padding:4px 6px;font-weight:bold;">${op}</td><td style="border:1px solid #000;padding:4px;"></td><td style="border:1px solid #000;padding:4px;"></td><td style="border:1px solid #000;padding:4px;"></td></tr>`).join('')}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+    });
+  });
+
+  const win = window.open('','_blank');
+  if (!win) { toast('Popup blocked — please allow popups for this site','err'); return; }
+  win.document.open();
+  win.document.write('<!DOCTYPE html><html><head><title>Order Report — Q' + q.number + '</title></head><body></body></html>');
+  win.document.close();
+  const style = win.document.createElement('style');
+  style.textContent = 'body{margin:0;padding:20px;background:#666;}.report-page{margin:0 auto 20px;box-shadow:0 2px 8px rgba(0,0,0,.4);}@media print{@page{size:landscape;margin:0;}body{background:white;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.report-page{box-shadow:none;margin:0;}}';
+  win.document.head.appendChild(style);
+  // Load QR code library
+  const qrScript = win.document.createElement('script');
+  qrScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+  win.document.head.appendChild(qrScript);
+  win.document.body.innerHTML = pages;
+  win.document.close();
+  win.focus();
+  // Generate QR codes after library loads
+  qrScript.onload = () => {
+    // Build list of QR targets from pages
+    const qrTargets = [];
+    details.forEach((detail, di) => {
+      const allItems = detail.items || [];
+      const allOther = detail.otherItems || [];
+      if (!allItems.length && !allOther.length) return;
+      const detailNum = String(di+1).padStart(2,'0');
+      const chunkCount = Math.ceil((allItems.length + allOther.length) / MAX_ROWS) || 1;
+      for (let ci=0; ci<chunkCount; ci++) {
+        qrTargets.push({id:`qr-${detailNum}-${ci}`, detailNum, ci});
+      }
+    });
+    qrTargets.forEach(({id, detailNum}) => {
+      const el = win.document.getElementById(id);
+      if (!el) return;
+      const qrData = `AWF|Q${q.number}|PO:${q.po_number||''}|DET:${detailNum}|DUE:${q.due_date||''}`;
+      try {
+        new win.QRCode(el, {text: qrData, width: 120, height: 120, correctLevel: win.QRCode.CorrectLevel.L});
+      } catch(e) { el.title = qrData; }
+    });
+    setTimeout(()=>win.print(),800);
+  };
+  qrScript.onerror = () => setTimeout(()=>win.print(),600);
+}
+
+// ============================================================
+// WON STATUS
+// ============================================================
+function markWon(){
+  if(!currentQuoteId) return;
+  // Pre-fill PO if already set
+  const q = quotes.find(x=>x.id===currentQuoteId);
+  document.getElementById('won-po').value = q?.po_number || '';
+  document.getElementById('won-due').value = q?.due_date ? q.due_date.substring(0,10) : '';
+  document.getElementById('won-err').textContent = '';
+  document.getElementById('won-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('won-po').focus(),80);
+}
+function closeWonModal(){
+  document.getElementById('won-modal').classList.remove('open');
+}
+async function confirmWon(){
+  const po = document.getElementById('won-po').value.trim();
+  const due = document.getElementById('won-due').value;
+  const errEl = document.getElementById('won-err');
+  if(!po){ errEl.textContent='PO Number is required.'; return; }
+  errEl.textContent='Saving…';
+  const patch = {
+    won: true,
+    won_at: new Date().toISOString(),
+    po_number: po,
+    due_date: due || null
+  };
+  const{error}=await sbDB.from('quotes').update(patch).eq('id',currentQuoteId);
+  if(error){ errEl.textContent='Error: '+error.message; return; }
+  closeWonModal();
+  toast('Marked as Won ✓ — PO: '+po,'ok');
+  await loadQuotes();
+  await openQuote(currentQuoteId);
+}
+
+// ============================================================
+// SESSION KEEPALIVE — ping every 4 min to prevent timeout
+// ============================================================
+// startKeepalive removed — was causing lock conflicts
+
+// ============================================================
+// TAB VISIBILITY — reinitialize connection when tab comes back into focus
+// ============================================================
+// visibilitychange removed
+
+// ============================================================
+// PRICING DASHBOARD
+// ============================================================
+function loadPricingConfig() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('awf_pricing_v1') || 'null');
+    if (stored) {
+      CONFIG.materialRate      = stored.flat    ?? CONFIG.materialRate;
+      CONFIG.tubeMaterialRate  = stored.tube    ?? CONFIG.tubeMaterialRate;
+      CONFIG.angleMaterialRate = stored.angle   ?? CONFIG.angleMaterialRate;
+      CONFIG.channelRate       = stored.channel ?? CONFIG.tubeMaterialRate;
+    }
+  } catch(e) {}
+}
+
+function openPricingDash() {
+  loadPricingConfig();
+  document.getElementById('pr-flat').value    = CONFIG.materialRate.toFixed(2);
+  document.getElementById('pr-tube').value    = CONFIG.tubeMaterialRate.toFixed(2);
+  document.getElementById('pr-angle').value   = CONFIG.angleMaterialRate.toFixed(2);
+  document.getElementById('pr-channel').value = (CONFIG.channelRate ?? CONFIG.tubeMaterialRate).toFixed(2);
+  document.getElementById('pr-note').value    = '';
+  renderPricingHistory();
+  document.getElementById('pricing-modal').classList.add('open');
+}
+
+function closePricingDash() {
+  document.getElementById('pricing-modal').classList.remove('open');
+}
+
+function savePricingRates() {
+  const flat    = parseFloat(document.getElementById('pr-flat').value);
+  const tube    = parseFloat(document.getElementById('pr-tube').value);
+  const angle   = parseFloat(document.getElementById('pr-angle').value);
+  const channel = parseFloat(document.getElementById('pr-channel').value);
+  const note    = document.getElementById('pr-note').value.trim();
+  if ([flat,tube,angle,channel].some(isNaN)) { toast('All rates must be valid numbers','err'); return; }
+
+  const dateStr = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
+  const changes = [];
+  const oldFlat    = CONFIG.materialRate;
+  const oldTube    = CONFIG.tubeMaterialRate;
+  const oldAngle   = CONFIG.angleMaterialRate;
+  const oldChannel = CONFIG.channelRate ?? CONFIG.tubeMaterialRate;
+
+  if (flat    !== oldFlat)    changes.push(`Flat/Plate: $${oldFlat.toFixed(2)} → $${flat.toFixed(2)}`);
+  if (tube    !== oldTube)    changes.push(`Tube: $${oldTube.toFixed(2)} → $${tube.toFixed(2)}`);
+  if (angle   !== oldAngle)   changes.push(`Angle: $${oldAngle.toFixed(2)} → $${angle.toFixed(2)}`);
+  if (channel !== oldChannel) changes.push(`C Channel: $${oldChannel.toFixed(2)} → $${channel.toFixed(2)}`);
+
+  if (!changes.length) { toast('No changes to save',''); closePricingDash(); return; }
+
+  CONFIG.materialRate      = flat;
+  CONFIG.tubeMaterialRate  = tube;
+  CONFIG.angleMaterialRate = angle;
+  CONFIG.channelRate       = channel;
+
+  try { localStorage.setItem('awf_pricing_v1', JSON.stringify({flat,tube,angle,channel})); } catch(e) {}
+
+  try {
+    const history = JSON.parse(localStorage.getItem('awf_pricing_history_v1') || '[]');
+    history.unshift({date:dateStr, ts:Date.now(), changes, note:note||null, by:currentProfile?.full_name||currentUser?.email||'unknown'});
+    if (history.length > 200) history.length = 200;
+    localStorage.setItem('awf_pricing_history_v1', JSON.stringify(history));
+  } catch(e) {}
+
+  toast('Pricing updated ✓','ok');
+  renderPricingHistory();
+  document.getElementById('pr-note').value = '';
+  if (currentQuoteId) recalcDetailDisplay();
+}
+
+function renderPricingHistory() {
+  const el = document.getElementById('pricing-history');
+  if (!el) return;
+  try {
+    const history = JSON.parse(localStorage.getItem('awf_pricing_history_v1') || '[]');
+    if (!history.length) { el.innerHTML = '<div style="color:var(--text3);padding:8px 0;">No changes yet.</div>'; return; }
+    el.innerHTML = history.map(entry => `
+      <div style="border:1px solid var(--border);border-radius:5px;padding:9px 12px;margin-bottom:7px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+          <span style="font-family:var(--font);font-size:11px;color:var(--amber)">${entry.date}</span>
+          <span style="font-size:11px;color:var(--text3)">by ${esc(entry.by)}</span>
+          ${entry.note?`<span style="font-size:11px;color:var(--text2);margin-left:auto;font-style:italic;">${esc(entry.note)}</span>`:''}
+        </div>
+        ${entry.changes.map(c=>`<div style="font-size:12px;color:var(--text);font-family:var(--font);margin-bottom:2px;">· ${c}</div>`).join('')}
+      </div>`).join('');
+  } catch(e) { el.innerHTML = '<div style="color:var(--text3)">Could not load history.</div>'; }
+}
+
+// Load saved pricing on startup
+window.addEventListener('load', () => loadPricingConfig());
+
+// Close pricing modal on overlay click
+document.addEventListener('DOMContentLoaded', () => {
+  const pm = document.getElementById('pricing-modal');
+  if (pm) pm.addEventListener('click', e => { if(e.target===e.currentTarget) closePricingDash(); });
+});
+
+let toastTimer;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast show'+(type?' '+type:'');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ============================================================
+// PHASE 3: PDF BOM PARSER — MULTI-FILE
+// ============================================================
+let pendingPdfDetails = []; // [{name, items, error}]
+
+function resetPdfImport() {
+  const proc = document.getElementById('pdf-processing');
+  const prev = document.getElementById('pdf-preview');
+  const btn  = document.getElementById('pdf-import-btn');
+  const inp  = document.getElementById('pdf-file-input');
+  const sum  = document.getElementById('pdf-summary');
+  const dz   = document.getElementById('pdf-drop-zone');
+  if (proc) proc.style.display = 'none';
+  if (prev) prev.style.display = 'none';
+  if (btn)  btn.style.display = 'none';
+  if (inp)  inp.value = '';
+  if (sum)  sum.textContent = '';
+  if (dz)   { dz.style.borderColor = ''; dz.style.background = ''; }
+  pendingPdfDetails = [];
+}
+
+function handlePdfDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('pdf-drop-zone').style.borderColor = '';
+  document.getElementById('pdf-drop-zone').style.background = '';
+  const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
+  if (!files.length) { toast('Please drop PDF files only', 'err'); return; }
+  handlePdfFiles(files);
+}
+
+async function handlePdfFiles(fileList) {
+  const files = Array.from(fileList);
+  if (!files.length) return;
+
+  pendingPdfDetails = [];
+  document.getElementById('pdf-processing').style.display = 'block';
+  document.getElementById('pdf-preview').style.display = 'none';
+  document.getElementById('pdf-import-btn').style.display = 'none';
+  document.getElementById('pdf-summary').textContent = '';
+
+  const statusContainer = document.getElementById('pdf-file-statuses');
+  statusContainer.innerHTML = files.map((f,i) => `
+    <div id="pdf-file-${i}" style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:6px;background:var(--surface2);margin-bottom:6px;">
+      <div class="spinner" style="flex-shrink:0"></div>
+      <span style="font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+      <span id="pdf-file-${i}-status" style="font-size:11px;color:var(--text2);font-family:var(--font)">Reading…</span>
+    </div>`).join('');
+
+  // Process files sequentially
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const statusEl = document.getElementById(`pdf-file-${i}-status`);
+    const rowEl = document.getElementById(`pdf-file-${i}`);
+    try {
+      statusEl.textContent = 'Parsing BOM…';
+      const details = await parsePdfBOM(file);
+      if (!details || details.length === 0) throw new Error('No BOM found');
+      // Each detail from this file
+      details.forEach(d => pendingPdfDetails.push({...d, sourceFile: file.name}));
+      const totalItems = details.reduce((s,d) => s + d.items.length, 0);
+      const goodItems = details.reduce((s,d) => s + d.items.filter(i=>!i.error).length, 0);
+      statusEl.textContent = `✓ ${details.length} detail${details.length>1?'s':''}, ${goodItems}/${totalItems} items`;
+      statusEl.style.color = 'var(--green)';
+      rowEl.querySelector('.spinner').style.display = 'none';
+      rowEl.querySelector('.spinner').insertAdjacentHTML('afterend','<span style="color:var(--green);font-size:16px">✓</span>');
+    } catch(e) {
+      pendingPdfDetails.push({name: file.name.replace('.pdf',''), sourceFile: file.name, items: [], error: 'PDF CANNOT BE READ: ' + e.message});
+      statusEl.textContent = '✗ Cannot read';
+      statusEl.style.color = 'var(--red)';
+      rowEl.querySelector('.spinner').style.display = 'none';
+      rowEl.querySelector('.spinner').insertAdjacentHTML('afterend','<span style="color:var(--red);font-size:16px">✗</span>');
+    }
+  }
+
+  renderPdfDetailsPreview();
+}
+
+async function parsePdfBOM(file) {
+  // Convert PDF to base64
+  const base64 = await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const prompt = [
+    'You are a BOM extraction engine. Return ONLY valid JSON. No explanation, no preamble, no markdown. Your entire response must be a JSON array starting with [ and ending with ].',
+    '',
+    'CRITICAL: Extract EVERY SINGLE line item from the BOM table. Do NOT skip, summarize, abbreviate, or omit any rows — even if items look repetitive or similar. If there are 49 items, return 49 items. Count the rows and make sure your output matches.',
+    'CRITICAL: One page = one detail. If a BOM table spans two or more columns on the same page, treat all columns as ONE single detail — merge them into one item list in order (left column first, then right column). Never split a single page into multiple details.',
+    'CRITICAL: If an item cannot be priced (missing dimensions, unknown material, non-standard spec, or any reason you cannot determine type and dims), set type to "other" AND set error to "LINE NOT READ: [reason]". Never leave an item as type other without an error field — if it cannot be priced it must be flagged.',
+    'CRITICAL: If text is small or dense, examine it very carefully. Do not skip items because they are hard to read — flag them with error if truly unreadable.',
+    '',
+    'Extract ALL Bill of Materials (BOM) tables from this engineering drawing PDF. Check EVERY page — the BOM may be on any page. This may be a scanned image PDF — use vision to read any text in images.',
+    '',
+    'If no BOM table exists at all, return exactly: [{"name":"No BOM Found","items":[{"qty":1,"type":"other","description":"No BOM table found in this PDF","error":"No BOM table found","dims":{}}]}]',
+    '',
+    'Otherwise return a JSON array:',
+    '[{"name":"detail name or drawing number","items":[{"qty":1,"type":"tube|flat|angle|cchannel|other","description":"brief desc","error":null,"dims":{}}]}]',
+    '',
+    'Dims keys by type:',
+    'tube: dim1,dim2,wall,tubeLength,tubeLengthUnit(mm|in),tubeType(square|rect|round)',
+    'flat: thickness,width,widthUnit(mm|in),length,lengthUnit(mm|in)',
+    'angle: angleLeg1,angleLeg2,angleThick,angleLength,angleLengthUnit(mm|in)',
+    'cchannel: cDepth,cFlange,cWall,cLength,cLengthUnit(mm|in),cLbFt(lb per foot if known)',
+    'other: {}',
+    '',
+    'Rules:',
+    '- STEEL GAUGE TO THICKNESS: When a drawing calls out steel by gauge or fractional thickness, map correctly: 1/8" steel = 11 gauge (0.120") — never output "1/8" as a thickness value, always convert to "11ga". Full gauge map: 7ga=0.179", 8ga=0.164", 9ga=0.150", 10ga=0.135", 11ga=0.120", 12ga=0.105", 13ga=0.090", 14ga=0.075", 16ga=0.060", 18ga=0.048", 20ga=0.036". Thicknesses 3/16" and above are plate — output as fractional string e.g. "3/16", "1/4".',
+    '- Dimensions in brackets like [4.5] = inches. Unbracketed = mm unless labeled in or with inch symbol',
+    '- Ignore holes, burn templates, machining-only items, weld symbols',
+    '- Fractional inches like 1/4, 5/8 stay as strings "1/4", "5/8"',
+    '- If a line cannot be parsed, include it with error:"LINE NOT READ: reason" and empty dims',
+    '- Bar stock uses type flat same as plate',
+    '- If only one BOM table exists, return array with one detail object'
+  ].join('\n');
+
+  const response = await fetch('https://new.chris-d24.workers.dev/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 16000,
+      messages: [{
+        role: 'user',
+        content: [
+          { 
+            type: 'document', 
+            source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+            title: 'Engineering Drawing'
+          },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
+
+  if (!response.ok) throw new Error('API returned ' + response.status);
+  const data = await response.json();
+  const text = data.content?.[0]?.text || '';
+  // Strip any markdown and find the JSON array
+  let clean = text.replace(/```json|```/g, '').trim();
+  // Find first [ and last ] to extract just the JSON array
+  const firstBracket = clean.indexOf('[');
+  const lastBracket = clean.lastIndexOf(']');
+  if (firstBracket === -1 || lastBracket === -1) {
+    throw new Error('No JSON array in response. Got: ' + clean.slice(0, 100));
+  }
+  clean = clean.slice(firstBracket, lastBracket + 1);
+  const parsed = JSON.parse(clean);
+  if (!Array.isArray(parsed)) throw new Error('Unexpected response format');
+  return parsed;
+}
+
+function renderPdfDetailsPreview() {
+  const preview = document.getElementById('pdf-details-preview');
+  const validDetails = pendingPdfDetails.filter(d => !d.error || d.items.length > 0);
+  const errorDetails = pendingPdfDetails.filter(d => d.error && d.items.length === 0);
+  const totalGoodItems = pendingPdfDetails.reduce((s,d) => s + d.items.filter(i=>!i.error).length, 0);
+  const totalBadItems = pendingPdfDetails.reduce((s,d) => s + d.items.filter(i=>i.error).length, 0);
+
+  let html = '';
+
+  // Error files
+  errorDetails.forEach(d => {
+    html += `<div style="padding:10px 14px;border-radius:6px;background:var(--red-dim);border:1px solid #7a2020;margin-bottom:8px;">
+      <div style="color:var(--red);font-weight:500;font-size:13px;">✗ PDF CANNOT BE READ</div>
+      <div style="color:var(--red);font-size:12px;opacity:.8;margin-top:2px">${esc(d.sourceFile)}: ${esc(d.error)}</div>
+    </div>`;
+  });
+
+  // Valid details
+  validDetails.forEach((d, di) => {
+    const goodItems = d.items.filter(i => !i.error);
+    const badItems = d.items.filter(i => i.error);
+    html += `<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:10px;overflow:hidden;">
+      <div style="padding:8px 12px;background:var(--surface2);display:flex;align-items:center;gap:8px;">
+        <span style="font-family:var(--font);font-size:12px;color:var(--amber);font-weight:500">${esc(d.name)}</span>
+        <span style="font-size:11px;color:var(--text3)">${esc(d.sourceFile)}</span>
+        <span style="margin-left:auto;font-size:11px;color:${badItems.length?'var(--warn)':'var(--green)'}">
+          ${goodItems.length} items${badItems.length?' · '+badItems.length+' failed':''}
+        </span>
+      </div>
+      ${goodItems.map(item => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 12px;border-top:1px solid var(--border);">
+          <span style="font-family:var(--font);font-size:11px;color:var(--amber);width:24px;text-align:right">${item.qty}×</span>
+          <span style="font-size:10px;padding:2px 5px;border-radius:3px;background:var(--bg);color:var(--text2);font-family:var(--font);width:52px;text-align:center">${item.type}</span>
+          <span style="font-size:12px;color:var(--text);flex:1">${formatDimsPreview(item)}</span>
+        </div>`).join('')}
+      ${badItems.map(item => `
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 12px;border-top:1px solid var(--border);background:var(--red-dim);">
+          <span style="font-size:11px;color:var(--red);flex:1">⚠ ${esc(item.error||'LINE NOT READ')}</span>
+        </div>`).join('')}
+    </div>`;
+  });
+
+  preview.innerHTML = html;
+  document.getElementById('pdf-preview').style.display = 'block';
+
+  const importable = validDetails.length;
+  document.getElementById('pdf-summary').textContent =
+    `${importable} detail${importable!==1?'s':''} ready · ${totalGoodItems} items · ${totalBadItems} failed lines`;
+  if (importable > 0) document.getElementById('pdf-import-btn').style.display = 'block';
+}
+
+function formatDimsPreview(item) {
+  const d = item.dims || {};
+  if (item.type === 'tube') {
+    const isRound = (d.tubeType||'square') === 'round';
+    return isRound
+      ? `${d.dim1}" OD × ${d.wall}" wall × ${d.tubeLength}${d.tubeLengthUnit}`
+      : `${d.dim1}×${d.dim2} × ${d.wall}" wall × ${d.tubeLength}${d.tubeLengthUnit}`;
+  }
+  if (item.type === 'flat') return `${d.thickness}" × ${d.width}${d.widthUnit||'mm'} × ${d.length}${d.lengthUnit||'mm'}`;
+  if (item.type === 'angle') return `${d.angleLeg1}×${d.angleLeg2} t${d.angleThick} × ${d.angleLength}${d.angleLengthUnit||'mm'}`;
+  if (item.type === 'cchannel') return `C${d.cDepth}${d.cLbFt?' @ '+d.cLbFt+'lb/ft':''} × ${d.cLength}${d.cLengthUnit||'mm'}`;
+  return item.description || 'Other item';
+}
+
+function confirmPdfImport() {
+  const validDetails = pendingPdfDetails.filter(d => !d.error || d.items.length > 0);
+  if (!validDetails.length) return;
+
+  // Remove the initial blank Detail #1 if it's empty (nothing entered yet)
+  if (details.length === 1 && !details[0].name && !details[0].items.length && !details[0].otherItems.length) {
+    details = [];
+  }
+
+  let totalImported = 0;
+  validDetails.forEach(d => {
+    const goodItems = d.items.filter(i => !i.error);
+    if (!goodItems.length) return;
+
+    // Add a new detail for each
+    const newDetail = {
+      id: nextLocalId++,
+      name: d.name || d.sourceFile?.replace('.pdf','') || 'Imported Detail',
+      items: [],
+      otherItems: [],
+      miters: 0,
+      holes: 0,
+      adjustment: 0,
+      quantity: 1,
+      notes: ''
+    };
+
+    d.items.forEach(item => {
+      const dm = item.dims || {};
+      const hasError = !!(item.error);
+      newDetail.items.push({
+        id: nextLocalId++,
+        type: hasError ? 'other' : item.type,
+        qty: item.qty || 1,
+        manualPrice: '',
+        parseError: hasError ? (item.error || 'LINE NOT READ') : '',
+        description: hasError ? (item.error || 'LINE NOT READ') : '',
+        thickness: dm.thickness||'', width: dm.width||'', widthUnit: dm.widthUnit||'in',
+        length: dm.length||'', lengthUnit: dm.lengthUnit||'in',
+        dim1: dm.dim1||'', dim2: dm.dim2||'', wall: dm.wall||'',
+        tubeLength: dm.tubeLength||'', tubeLengthUnit: dm.tubeLengthUnit||'mm', tubeType: dm.tubeType||'square',
+        angleLeg1: dm.angleLeg1||'', angleLeg2: dm.angleLeg2||'', angleThick: dm.angleThick||'',
+        angleLength: dm.angleLength||'', angleLengthUnit: dm.angleLengthUnit||'mm',
+        cDepth: dm.cDepth||'', cFlange: dm.cFlange||'', cWall: dm.cWall||'',
+        cLength: dm.cLength||'', cLengthUnit: dm.cLengthUnit||'mm',
+        cLbFt: dm.cLbFt||'', cUseLbFt: !!(dm.cLbFt && dm.cLbFt !== '')
+      });
+      totalImported++;
+    });
+
+    details.push(newDetail);
+  });
+
+  activeDetailIdx = details.length - 1;
+  renderDetailBar(false);
+  renderDetailBody(false);
+  saveItems();
+  showQuoteTab('build');
+  toast(`Imported ${validDetails.length} detail${validDetails.length!==1?'s':''}, ${totalImported} items ✓`, 'ok');
+  pendingPdfDetails = [];
+}
+
+// Close on overlay click
+
+
+// ============================================================
+// ODOO CUSTOMER INTEGRATION
+// ============================================================
+const ODOO_URL = 'https://all-weld-inc2.odoo.com';
+let odooCustomers = [], pendingCustData = null;
+
+async function fetchOdooCustomers() {
+  const listEl = document.getElementById('odoo-list');
+  const countEl = document.getElementById('odoo-count');
+  listEl.innerHTML = '<div class="modal-status"><div class="spinner" style="margin:0 auto"></div><br>Fetching from Odoo…</div>';
+  countEl.textContent = '';
+  try {
+    const res = await fetch(ODOO_URL + '/web/dataset/call_kw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        jsonrpc: '2.0', method: 'call', id: 1,
+        params: {
+          model: 'res.partner', method: 'search_read',
+          args: [[['customer_rank', '>', 0], ['active', '=', true]]],
+          kwargs: { fields: ['id','name','email','phone','mobile','street','city','state_id','zip'], limit: 300, order: 'name asc' }
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.data?.message || 'Odoo error');
+    odooCustomers = data.result || [];
+    countEl.textContent = odooCustomers.length + ' customers';
+    renderOdooList(odooCustomers);
+  } catch(e) {
+    listEl.innerHTML = `<div class="modal-status" style="color:var(--red)">⚠ Could not reach Odoo.<br><small style="color:var(--text2)">Make sure you're logged into all-weld-inc2.odoo.com in this browser.<br>${e.message}</small></div>`;
+  }
+}
+
+function renderOdooList(list) {
+  const listEl = document.getElementById('odoo-list');
+  if (!list.length) { listEl.innerHTML = '<div class="modal-status">No customers found.</div>'; return; }
+  listEl.innerHTML = list.map(c => `
+    <div class="odoo-row" onclick="selectOdooCustomer(${c.id})">
+      <div class="odoo-row-name">${esc(c.name)}</div>
+      <div class="odoo-row-meta">${[c.phone||c.mobile, c.email].filter(Boolean).join(' · ')||'No contact info on file'}</div>
+    </div>`).join('');
+}
+
+function filterOdooList(q) {
+  const filtered = q.trim() ? odooCustomers.filter(c => c.name.toLowerCase().includes(q.toLowerCase())) : odooCustomers;
+  renderOdooList(filtered);
+}
+
+function selectOdooCustomer(odooId) {
+  const c = odooCustomers.find(x => x.id === odooId);
+  if (!c) return;
+  // Check if already in Supabase customers
+  pendingCustData = { odoo_id: odooId, name: c.name, email: c.email||'', phone: c.phone||c.mobile||'' };
+  closeOdooModal();
+  // Pre-fill the customer detail modal
+  document.getElementById('cf-name').value = c.name;
+  document.getElementById('cf-contact').value = '';
+  document.getElementById('cf-email-quotes').value = c.email||'';
+  document.getElementById('cf-email-ap').value = '';
+  document.getElementById('cf-phone').value = c.phone||c.mobile||'';
+  document.getElementById('cf-odoo-id').value = odooId;
+  document.getElementById('cust-modal').classList.add('open');
+}
+
+async function saveCustomer() {
+  const name = document.getElementById('cf-name').value.trim();
+  if (!name) { toast('Customer name required','err'); return; }
+  const rec = {
+    name,
+    company: name,
+    email: document.getElementById('cf-email-quotes').value.trim(),
+    phone: document.getElementById('cf-phone').value.trim(),
+    created_by: currentProfile?.id
+  };
+  // Upsert into customers table
+  const { data, error } = await sbDB.from('customers').insert(rec).select().single();
+  if (error) { toast('Error saving customer','err'); return; }
+  // Apply to current quote's customer field
+  const custField = document.getElementById('field-customer');
+  if (custField) { custField.value = name; schedSave(); }
+  closeCustModal();
+  toast('Customer saved ✓','ok');
+}
+
+function openOdooModal() { document.getElementById('odoo-modal').classList.add('open'); document.getElementById('odoo-search').value=''; }
+function closeOdooModal() { document.getElementById('odoo-modal').classList.remove('open'); }
+function closeCustModal() { document.getElementById('cust-modal').classList.remove('open'); pendingCustData=null; }
+
+
+// ============================================================
+// QUOTE PREVIEW + PRINT
+// ============================================================
+function showQuoteTab(tab) {
+  const buildArea  = document.getElementById('build-area');
+  const printArea  = document.getElementById('print-area');
+  const pdfArea    = document.getElementById('pdf-import-area');
+  const tabBuild   = document.getElementById('tab-build');
+  const tabPreview = document.getElementById('tab-preview');
+  const tabPdf     = document.getElementById('tab-pdf');
+  // Hide all areas
+  if (buildArea) buildArea.style.display = 'none';
+  if (printArea) printArea.style.display = 'none';
+  if (pdfArea)   pdfArea.style.display = 'none';
+  [tabBuild, tabPreview, tabPdf].forEach(t => t && t.classList.remove('active'));
+  if (tab === 'preview') {
+    if (printArea) { printArea.style.display = 'block'; } 
+    else { toast('Preview not available — reopen the quote','err'); return; }
+    if (tabPreview) tabPreview.classList.add('active');
+    renderPrintPreview();
+  } else if (tab === 'pdf') {
+    if (pdfArea) pdfArea.style.display = 'block';
+    if (tabPdf) tabPdf.classList.add('active');
+    resetPdfImport();
+  } else {
+    if (buildArea) buildArea.style.display = 'block';
+    if (tabBuild) tabBuild.classList.add('active');
+  }
+}
+
+function renderPrintPreview() {
+  const el = document.getElementById('quote-print-area');
+  if (!el) return;
+  // Always try fresh quote first, fall back to quotes array
+  let q = quotes.find(x => x.id === currentQuoteId);
+  if (!q) { toast('Quote not loaded — please reopen','err'); return; }
+  // Read from DOM fields if available, fall back to DB values
+  const customer = document.getElementById('field-customer')?.value || q.customer_name || '—';
+  const terms    = document.getElementById('field-terms')?.value || q.terms || '';
+  const notes    = document.getElementById('field-notes')?.value || q.notes || '';
+  const location = document.getElementById('field-location')?.value || q.location || '';
+  const custQuote= document.getElementById('field-cust-quote')?.value || q.customer_quote_num || '—';
+  const leadTime = document.getElementById('field-lead')?.value || q.lead_time_weeks || '';
+  const dateStr  = new Date().toLocaleDateString('en-US', {month:'2-digit',day:'2-digit',year:'numeric'});
+  const grand    = calcGrandTotal();
+
+  let rows = '', n = 1;
+  for (const d of details) {
+    if (!d.items.length && !d.otherItems.length) continue;
+    const {total} = calcDetailTotal(d);
+    const qty = parseInt(d.quantity) || 1;
+    rows += `<tr>
+      <td>${n++}</td>
+      <td><strong>${esc(d.name || 'Part')}</strong>${location ? '<br><span style="font-size:10px;color:#666">'+esc(location)+'</span>' : ''}</td>
+      <td style="text-align:center">${qty}</td>
+      <td style="text-align:right">${fmt(qty ? total/qty : total)}</td>
+      <td style="text-align:right">${fmt(total)}</td>
+    </tr>`;
+  }
+  for (const qi of quoteLevelItems) {
+    const tot = (parseFloat(qi.unitPrice)||0) * (parseInt(qi.qty)||1);
+    rows += `<tr>
+      <td>${n++}</td>
+      <td>${esc(qi.desc)}</td>
+      <td style="text-align:center">${qi.qty}</td>
+      <td style="text-align:right">${fmt(parseFloat(qi.unitPrice)||0)}</td>
+      <td style="text-align:right">${fmt(tot)}</td>
+    </tr>`;
+  }
+
+  el.innerHTML = `
+    <div class="print-header">
+      <img src="https://allweldfab.com/logo.png" class="print-logo" alt="All Weld" onerror="this.style.display='none'">
+      <div class="print-company">
+        <h1>All Welding and Fabricating</h1>
+        <div style="font-size:11px;color:#444">1882 Woodslee Drive, Troy, MI 48083<br>248-689-0986 | Quotes@allweldfab.com</div>
+        <div style="margin-top:4px;font-size:12px">Date &nbsp; ${dateStr}</div>
+        <div class="print-quote-box">QUOTE #${q.number}</div>
+      </div>
+    </div>
+    <table class="print-meta-table">
+      <tr><td>Customer</td><td>${esc(customer)}</td><td>Entered By</td><td>${esc(currentProfile?.full_name || currentUser?.email || '')}</td></tr>
+      <tr><td>Customer Quote #</td><td>${esc(custQuote)}</td><td>Terms</td><td>${esc(terms||'—')}</td></tr>
+      ${location ? `<tr><td>Job Site</td><td colspan="3">${esc(location)}</td></tr>` : ''}
+      ${leadTime ? `<tr><td>Lead Time</td><td colspan="3">${leadTime} week(s)</td></tr>` : ''}
+    </table>
+    <table class="print-items-table">
+      <thead><tr><th>#</th><th>Description</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Price</th></tr></thead>
+      <tbody>
+        ${rows}
+        <tr class="print-total-row"><td colspan="3"><strong>Total</strong></td><td></td><td style="text-align:right"><strong>${fmt(grand)}</strong></td></tr>
+      </tbody>
+    </table>
+    ${notes ? `<div style="margin-bottom:16px;font-size:11px;"><strong>Notes:</strong> ${esc(notes)}</div>` : ''}
+    <div class="print-footer">All Welding &amp; Fabrication Co. | allweldfab.com | Quotes@allweldfab.com | Quote valid for 30 days</div>`;
+}
+
+function printQuote() {
+  const q = quotes.find(x => x.id === currentQuoteId);
+  renderPrintPreview();
+  showQuoteTab('preview');
+  const origTitle = document.title;
+  document.title = 'All Weld Q' + (q?.number || '');
+  setTimeout(() => { window.print(); document.title = origTitle; }, 350);
+}
+
+// ============================================================
+// SHOP DISPATCH SCREEN
+// ============================================================
+let shopPendingData = [];   // won quotes with undispatched details
+let shopActiveData  = [];   // dispatched shop_jobs
+let shopCurrentTab  = 'pending';
+
+function openShopScreen() {
+  document.getElementById('shop-screen').classList.add('open');
+  document.getElementById('app').style.display = 'none';
+  loadShopScreen();
+}
+function closeShopScreen() {
+  document.getElementById('shop-screen').classList.remove('open');
+  document.getElementById('app').style.display = 'flex';
+}
+function switchShopTab(tab, el) {
+  shopCurrentTab = tab;
+  document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('shop-pending-panel').style.display = tab === 'pending' ? 'block' : 'none';
+  document.getElementById('shop-active-panel').style.display  = tab === 'active'  ? 'block' : 'none';
+  if (tab === 'active') loadActiveJobs();
+  if (tab === 'pending') loadPendingDispatch();
+}
+
+async function loadShopScreen() {
+  await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
+}
+
+async function loadPendingDispatch() {
+  const panel = document.getElementById('shop-pending-list');
+  panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div>';
+
+  // 1. All won quotes with a PO number
+  const { data: wonQuotes, error } = await sbDB.from('quotes')
+    .select('id,number,customer_name,po_number,due_date,won,status')
+    .eq('won', true);
+  if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading quotes.</div>'; return; }
+
+  // 2. Already-dispatched (po_number, detail_number) pairs — fetch full records
+  const { data: dispatched } = await sbDB.from('shop_jobs').select('*');
+  const dispatchedSet = new Set((dispatched||[]).map(d => `${d.po_number}::${d.detail_number}`));
+  const dispatchedJobMap = {};
+  for (const d of (dispatched||[])) dispatchedJobMap[`${d.po_number}::${d.detail_number}`] = d;
+
+  // 3. Load line items for all won quotes to find details
+  if (!wonQuotes || !wonQuotes.length) {
+    panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No won quotes with PO numbers found.</div>';
+    return;
+  }
+  const quoteIds = wonQuotes.map(q => q.id);
+
+  // Fetch all line items for these quotes in one call
+  // We filter client-side since REST API doesn't support IN easily here
+  let allItems = [];
+  for (const qid of quoteIds) {
+    const { data: items } = await sbDB.from('line_items').select('*').eq('quote_id', qid).order('sort_order');
+    if (items) allItems = allItems.concat(items.map(i => ({...i, _qid: qid})));
+  }
+
+  // Build detail map per quote
+  const quoteDetailMap = {};
+  for (const row of allItems) {
+    const qid = row._qid;
+    if (!quoteDetailMap[qid]) quoteDetailMap[qid] = {};
+    const di = (row.item_data && row.item_data.detail_idx !== undefined) ? row.item_data.detail_idx : 0;
+    if (!quoteDetailMap[qid][di]) quoteDetailMap[qid][di] = { items: [], otherItems: [], meta: null };
+    const d = quoteDetailMap[qid][di];
+    if (row.item_type === 'detail_meta') {
+      d.meta = row;
+    } else if (row.item_type === 'other') {
+      d.otherItems.push(row);
+    } else if (row.item_type !== 'quote_level') {
+      d.items.push(row);
+    }
+  }
+
+  // Filter to quotes/details that have undispatched details
+  shopPendingData = [];
+  for (const q of wonQuotes) {
+    if (!q.po_number) continue;
+    const detailMap = quoteDetailMap[q.id] || {};
+    const pendingDetails = [];
+    const allDetailKeys = Object.keys(detailMap).sort((a,b) => parseInt(a)-parseInt(b));
+    for (const di of allDetailKeys) {
+      const d = detailMap[di];
+      const allItems = [...d.items, ...d.otherItems];
+      if (!allItems.length && !d.meta) continue;
+      const detailNum = String(parseInt(di)+1).padStart(2,'0');
+      const key = `${q.po_number}::${detailNum}`;
+      pendingDetails.push({
+        di: parseInt(di),
+        detailNum,
+        dispatched: dispatchedSet.has(key),
+        shopJob: dispatchedJobMap[key] || null,
+        meta: d.meta,
+        items: d.items,
+        otherItems: d.otherItems
+      });
+    }
+    if (pendingDetails.some(d => !d.dispatched)) {
+      shopPendingData.push({ quote: q, details: pendingDetails });
+    }
+  }
+
+  if (!shopPendingData.length) {
+    panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">✓ All won jobs are dispatched.</div>';
+    return;
+  }
+
+  panel.innerHTML = shopPendingData.map((entry, ei) => {
+    const q = entry.quote;
+    const dueLabel = formatDueDate(q.due_date);
+    const pendingCount = entry.details.filter(d => !d.dispatched).length;
+    const totalCount   = entry.details.length;
+    return `
+    <div class="dispatch-card" id="dcard-${ei}">
+      <div class="dispatch-card-hdr" onclick="toggleDispatchCard(${ei})">
+        <span class="dispatch-po">PO: ${esc(q.po_number)}</span>
+        <span class="dispatch-customer">${esc(q.customer_name||'—')}</span>
+        <span class="dispatch-due ${dueLabel.cls}">${dueLabel.text}</span>
+        <span class="dispatch-detail-count">${pendingCount} of ${totalCount} detail${totalCount!==1?'s':''} pending ▾</span>
+      </div>
+      <div class="dispatch-body" id="dbody-${ei}">
+        ${entry.details.map((det, deti) => renderDetailDispatchRow(q, det, ei, deti)).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDetailDispatchRow(q, det, ei, deti) {
+  const meta = det.meta;
+  const detailName = meta ? (meta.description || meta.item_data?.detail_name || '') : '';
+  const qty = meta?.item_data?.quantity || 1;
+  const allLineItems = [
+    ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
+    ...det.otherItems.map((item, idx) => ({...item, _sym: String(det.items.length+idx+1), _isOther: true}))
+  ];
+
+  if (det.dispatched) {
+    const logNum = det.shopJob?.log_number || '';
+    const dispName = det.shopJob?.detail_name || detailName;
+    return `<div class="detail-dispatch-row" id="drow-${ei}-${deti}">
+      <div class="detail-dispatch-hdr" style="flex-wrap:wrap;gap:8px;">
+        <span class="detail-num-badge">Det. ${det.detailNum}</span>
+        <span class="detail-dispatch-name">${esc(dispName)}</span>
+        <span class="detail-dispatch-qty">Qty: ${qty}</span>
+        ${logNum ? `<span style="font-family:var(--font);font-size:11px;color:var(--amber);border:1px solid var(--amber-dim);background:var(--amber-dim);border-radius:3px;padding:2px 7px;">Log# ${esc(logNum)}</span>` : `<span style="font-family:var(--font);font-size:11px;color:var(--red);border:1px solid var(--red-dim);background:var(--red-dim);border-radius:3px;padding:2px 7px;">No Log #</span>`}
+        <span class="detail-dispatched-badge" style="margin-left:auto;">✓ Dispatched</span>
+        <button class="btn btn-ghost btn-sm" onclick="editDispatchedDetail(${ei},${deti})" style="font-size:11px;">Edit</button>
+      </div>
+    </div>`;
+  }
+
+  const rows = allLineItems.map((item, idx) => {
+    const desc = item._isOther ? (item.description || 'Other item') : formatItemForReport(item.item_data ? {...item.item_data, type: item.item_type} : item);
+    const sawTypes = ['tube','angle','cchannel'];
+    const defaultStation = item._isOther ? 'PURCHASED' : (sawTypes.includes(item.item_type) ? 'SAW' : 'BURN');
+    return `<tr>
+      <td style="font-family:var(--font);color:var(--text2);width:40px;">${item._sym}</td>
+      <td style="width:50px;text-align:center;">${item.qty||1}</td>
+      <td>${esc(desc)}</td>
+      <td style="width:130px;">
+        <select class="station-select" id="sta-${ei}-${deti}-${idx}">
+          <option value="SAW"${defaultStation==='SAW'?' selected':''}>✂ Saw</option>
+          <option value="BURN"${defaultStation==='BURN'?' selected':''}>🔥 Burn Out</option>
+          <option value="PURCHASED"${defaultStation==='PURCHASED'?' selected':''}>📦 Purchased</option>
+        </select>
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="detail-dispatch-row" id="drow-${ei}-${deti}">
+    <div class="detail-dispatch-hdr" style="flex-wrap:wrap;gap:8px;">
+      <span class="detail-num-badge">Det. ${det.detailNum}</span>
+      <span class="detail-dispatch-name">${esc(detailName||'(unnamed detail)')}</span>
+      <span class="detail-dispatch-qty">Qty: ${qty}</span>
+      <button class="dispatch-btn" style="margin-left:auto;" onclick="openDispatchModal(${ei},${deti})">Release to Floor →</button>
+    </div>
+    <div style="padding:0 14px 12px;">
+      <table class="item-assignment-table">
+        <thead><tr>
+          <th>SYM</th><th>QTY</th><th>Description</th><th>Station</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function editDispatchedDetail(ei, deti) {
+  const entry = shopPendingData[ei];
+  const det   = entry.details[deti];
+  const job   = det.shopJob;
+  if (!job) { toast('Job record not found','err'); return; }
+  const rowEl = document.getElementById(`drow-${ei}-${deti}`);
+  if (!rowEl) return;
+  // Replace dispatched row with editable version
+  rowEl.innerHTML = `
+    <div class="detail-dispatch-hdr" style="flex-wrap:wrap;gap:8px;">
+      <span class="detail-num-badge">Det. ${det.detailNum}</span>
+      <input id="dname-${ei}-${deti}" value="${esc(job.detail_name||'')}" placeholder="Detail name…"
+        style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--text);font-size:13px;font-weight:500;padding:4px 8px;outline:none;min-width:160px;flex:1;">
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+        <label style="font-family:var(--font);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);white-space:nowrap;">Log #</label>
+        <input id="lognum-${ei}-${deti}" value="${esc(job.log_number||'')}" placeholder="e.g. 1042" maxlength="20"
+          style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-family:var(--font);font-size:13px;font-weight:500;padding:4px 8px;outline:none;width:100px;">
+        <button class="dispatch-btn" onclick="saveDispatchedEdit(${ei},${deti},'${job.id}')">Save →</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadPendingDispatch()" style="font-size:11px;">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function saveDispatchedEdit(ei, deti, jobId) {
+  const name   = document.getElementById(`dname-${ei}-${deti}`)?.value.trim();
+  const logNum = document.getElementById(`lognum-${ei}-${deti}`)?.value.trim() || null;
+  const {error} = await sbDB.from('shop_jobs')
+    .update({detail_name: name, log_number: logNum})
+    .eq('id', jobId);
+  if (error) { toast('Save error: ' + error.message, 'err'); return; }
+  toast('Updated ✓','ok');
+  await loadPendingDispatch();
+}
+
+// ── PENDING SEARCH ──
+function filterPendingList() {
+  const term = (document.getElementById('pending-search')?.value || '').toLowerCase().trim();
+  const cards = document.querySelectorAll('.dispatch-card');
+  cards.forEach((card, i) => {
+    const entry = shopPendingData[i];
+    if (!entry) return;
+    const q = entry.quote;
+    const hay = [q.po_number, q.customer_name, ...entry.details.map(d=>d.shopJob?.detail_name||d.meta?.description||'')].join(' ').toLowerCase();
+    card.style.display = (!term || hay.includes(term)) ? 'block' : 'none';
+  });
+}
+
+// ── ACTIVE SEARCH ──
+let _activeRows = []; // store rendered row data for filtering
+function filterActiveList() {
+  const term = (document.getElementById('active-search')?.value || '').toLowerCase().trim();
+  const rows = document.querySelectorAll('#shop-active-list tbody tr');
+  rows.forEach((row, i) => {
+    const job = _activeRows[i];
+    if (!job) return;
+    const hay = [job.po_number, job.customer, job.detail_number, job.detail_name, job.log_number, job.stage].join(' ').toLowerCase();
+    row.style.display = (!term || hay.includes(term)) ? '' : 'none';
+  });
+}
+
+// ── EDIT DISPATCHED DETAIL — standalone, no shopPendingData needed ──
+function editJobInline(jobId, detailNum, detailName, logNumber, rowEl) {
+  rowEl.innerHTML = `
+    <td colspan="7" style="padding:10px 12px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-family:var(--font);font-size:12px;color:var(--text3);">Det. ${esc(detailNum)}</span>
+        <input id="edit-name-${jobId}" value="${esc(detailName||'')}" placeholder="Detail name…"
+          style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--text);font-size:13px;padding:5px 9px;outline:none;flex:1;min-width:140px;">
+        <label style="font-family:var(--font);font-size:10px;text-transform:uppercase;color:var(--text3);white-space:nowrap;">Log #</label>
+        <input id="edit-log-${jobId}" value="${esc(logNumber||'')}" placeholder="e.g. 1042" maxlength="20"
+          style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-family:var(--font);font-size:13px;font-weight:500;padding:5px 9px;outline:none;width:110px;">
+        <button class="dispatch-btn btn-sm" onclick="saveJobInline('${jobId}')">Save →</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadActiveJobs()">Cancel</button>
+      </div>
+    </td>`;
+}
+
+async function saveJobInline(jobId) {
+  const name   = document.getElementById(`edit-name-${jobId}`)?.value.trim();
+  const logNum = document.getElementById(`edit-log-${jobId}`)?.value.trim() || null;
+  const {error} = await sbDB.from('shop_jobs').update({detail_name: name, log_number: logNum}).eq('id', jobId);
+  if (error) { toast('Save error: ' + error.message, 'err'); return; }
+  toast('Updated ✓', 'ok');
+  await loadActiveJobs();
+}
+
+function toggleDispatchCard(ei) {
+  const body = document.getElementById(`dbody-${ei}`);
+  body.classList.toggle('open');
+}
+
+// Pending dispatch modal state
+let _dispatchModalEi = null;
+let _dispatchModalDeti = null;
+
+function openDispatchModal(ei, deti) {
+  const entry = shopPendingData[ei];
+  const det   = entry.details[deti];
+  const q     = entry.quote;
+  const meta  = det.meta;
+  const detailName = meta ? (meta.description || meta.item_data?.detail_name || '') : '';
+
+  _dispatchModalEi   = ei;
+  _dispatchModalDeti = deti;
+
+  document.getElementById('dispatch-modal-detail').textContent =
+    `PO: ${q.po_number} · Det. ${det.detailNum} · Qty: ${meta?.item_data?.quantity||1}`;
+  document.getElementById('dispatch-modal-name').value  = detailName;
+  document.getElementById('dispatch-modal-log').value   = '';
+  document.getElementById('dispatch-modal-err').textContent = '';
+  document.getElementById('dispatch-modal').classList.add('open');
+  setTimeout(() => document.getElementById('dispatch-modal-log').focus(), 80);
+}
+
+function closeDispatchModal() {
+  document.getElementById('dispatch-modal').classList.remove('open');
+  _dispatchModalEi = null;
+  _dispatchModalDeti = null;
+}
+
+async function confirmDispatchModal() {
+  const log  = document.getElementById('dispatch-modal-log').value.trim();
+  const name = document.getElementById('dispatch-modal-name').value.trim();
+  const errEl = document.getElementById('dispatch-modal-err');
+  if (!log) { errEl.textContent = 'Log number is required.'; document.getElementById('dispatch-modal-log').focus(); return; }
+  errEl.textContent = 'Releasing…';
+  closeDispatchModal();
+  await dispatchDetail(_dispatchModalEi ?? 0, _dispatchModalDeti ?? 0, name, log);
+}
+
+async function dispatchDetail(ei, deti, editedName, logNumber) {
+  const entry = shopPendingData[ei];
+  const det   = entry.details[deti];
+  const q     = entry.quote;
+  const btn   = document.querySelector(`#drow-${ei}-${deti} .dispatch-btn`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Dispatching…'; }
+
+  // Use values passed from modal
+  const detailName = editedName || det.meta?.description || det.meta?.item_data?.detail_name || '';
+
+  // 1. Create shop_job row
+  const jobRec = {
+    quote_id:      q.id,
+    po_number:     q.po_number,
+    detail_number: det.detailNum,
+    detail_name:   detailName,
+    quantity:      det.meta?.item_data?.quantity || 1,
+    due_date:      q.due_date || null,
+    dispatched_by: currentProfile?.id || null,
+    log_number:    logNumber || null
+  };
+
+  const { data: newJob, error: jobErr } = await sbDB.from('shop_jobs').insert(jobRec).select().single();
+  if (jobErr) {
+    toast('Dispatch error: ' + jobErr.message, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Release to Floor →'; }
+    return;
+  }
+
+  // 2. Create shop_job_items rows
+  const allLineItems = [
+    ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
+    ...det.otherItems.map((item, idx) => ({...item, _sym: String(det.items.length+idx+1), _isOther: true}))
+  ];
+
+  const itemRecs = allLineItems.map((item, idx) => {
+    const staSel = document.getElementById(`sta-${ei}-${deti}-${idx}`);
+    const station = staSel ? staSel.value : 'SAW';
+    const desc = item._isOther
+      ? (item.description || 'Other item')
+      : formatItemForReport(item.item_data ? {...item.item_data, type: item.item_type} : item);
+    return {
+      shop_job_id:        newJob.id,
+      item_sym:           item._sym,
+      description:        desc,
+      quantity:           item.qty || 1,
+      station_assignment: station
+    };
+  });
+
+  if (itemRecs.length) {
+    const { error: itemErr } = await sbDB.from('shop_job_items').insert(itemRecs);
+    if (itemErr) { toast('Item save error: ' + itemErr.message, 'err'); }
+  }
+
+  toast(`Det. ${det.detailNum} — ${q.po_number} released to floor ✓`, 'ok');
+  // Reload both panels to reflect new state
+  await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
+}
+
+let activeJobsSort = { col: 'due_date', dir: 'asc' };
+
+async function loadActiveJobs() {
+  const panel = document.getElementById('shop-active-list');
+  panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div>';
+
+  // Get all dispatched jobs
+  const { data: jobs, error } = await sbDB.from('shop_jobs')
+    .select('*')
+    .order('due_date', {ascending: true, nullsFirst: false});
+  if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading jobs.</div>'; return; }
+  if (!jobs || !jobs.length) {
+    panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor yet.</div>';
+    return;
+  }
+
+  // Get customer names from quotes table via quote_id
+  const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
+  const customerMap = {};
+  for (const qid of quoteIds) {
+    const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
+    if (q) customerMap[qid] = q.customer_name || '—';
+  }
+
+  // Get latest event per job for current stage
+  const { data: events } = await sbDB.from('shop_events')
+    .select('shop_job_id,station,event_type,created_at')
+    .order('created_at', {ascending: false});
+
+  // Compute current stage per job:
+  // - If most recent event is a checkin → currently AT that station
+  // - If most recent event is a checkout → show station with ✓ (completed, between stations)
+  const stageMap = {};
+  for (const ev of (events||[])) {
+    if (!stageMap[ev.shop_job_id]) {
+      stageMap[ev.shop_job_id] = {
+        station: ev.station,
+        active: ev.event_type === 'checkin'
+      };
+    }
+  }
+
+  // Enrich jobs with customer and stage
+  const enriched = jobs.map(job => {
+    const s = stageMap[job.id];
+    return {
+      ...job,
+      customer: customerMap[job.quote_id] || '—',
+      stage: s ? s.station : 'DISPATCHED',
+      stageActive: s ? s.active : false
+    };
+  });
+
+  // Sort
+  const {col, dir} = activeJobsSort;
+  enriched.sort((a, b) => {
+    let av = a[col] || ''; let bv = b[col] || '';
+    if (col === 'due_date') { av = av||'9999'; bv = bv||'9999'; }
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return dir === 'asc' ? cmp : -cmp;
+  });
+
+  function thBtn(label, colKey) {
+    const active = activeJobsSort.col === colKey;
+    const arrow = active ? (activeJobsSort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+    return `<th style="cursor:pointer;user-select:none;${active?'color:var(--teal);':''}" onclick="sortActiveJobs('${colKey}')">${label}${arrow}</th>`;
+  }
+
+  // Store for filtering
+  _activeRows = enriched;
+
+  panel.innerHTML = `
+  <table class="jobs-table">
+    <thead><tr>
+      ${thBtn('PO #','po_number')}
+      ${thBtn('Customer','customer')}
+      ${thBtn('Det #','detail_number')}
+      ${thBtn('Description','detail_name')}
+      <th>Qty</th>
+      ${thBtn('Log #','log_number')}
+      ${thBtn('Due Date','due_date')}
+      ${thBtn('Stage','stage')}
+      <th></th>
+    </tr></thead>
+    <tbody>
+      ${enriched.map(job => {
+        const dueLabel = formatDueDate(job.due_date);
+        return `<tr id="jobrow-${job.id}">
+          <td style="font-family:var(--font);color:var(--amber);white-space:nowrap;">${esc(job.po_number)}</td>
+          <td style="font-size:12px;">${esc(job.customer)}</td>
+          <td style="font-family:var(--font);font-size:12px;white-space:nowrap;">Det. ${esc(job.detail_number)}</td>
+          <td style="font-size:12px;color:var(--text2);">${esc(job.detail_name||'—')}</td>
+          <td style="text-align:center;font-family:var(--font);">${job.quantity||1}</td>
+          <td style="font-family:var(--font);font-size:12px;${job.log_number?'color:var(--amber);':'color:var(--red);font-style:italic;'}">${esc(job.log_number||'missing')}</td>
+          <td style="white-space:nowrap;"><span class="dispatch-due ${dueLabel.cls}" style="font-size:11px;">${dueLabel.text}</span></td>
+          <td><span class="stage-badge stage-${job.stage}" style="${!job.stageActive&&job.stage!=='DISPATCHED'?'opacity:.6;':''}">
+            ${job.stageActive ? '⬤ ' : job.stage!=='DISPATCHED' ? '✓ ' : ''}${job.stage}
+          </span></td>
+          <td><button class="btn btn-ghost btn-sm" style="font-size:11px;white-space:nowrap;"
+            onclick="editJobInline('${job.id}','${esc(job.detail_number)}','${esc(job.detail_name||'')}','${esc(job.log_number||'')}',this.closest('tr'))">Edit</button></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function sortActiveJobs(col) {
+  if (activeJobsSort.col === col) {
+    activeJobsSort.dir = activeJobsSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    activeJobsSort = { col, dir: 'asc' };
+  }
+  loadActiveJobs();
+}
+
+
+function formatDueDate(dateStr) {
+  if (!dateStr) return { text: 'No due date', cls: '' };
+  const due = new Date(dateStr + 'T12:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.round((due - today) / 86400000);
+  const label = due.toLocaleDateString('en-US', {month:'numeric', day:'numeric'});
+  if (diff < 0)  return { text: `⚠ ${label} — OVERDUE`, cls: 'overdue' };
+  if (diff <= 5) return { text: `${label} — ${diff}d`, cls: 'soon' };
+  return { text: label, cls: '' };
+}
+
+
+document.getElementById('odoo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOdooModal(); });
+document.getElementById('cust-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeCustModal(); });
+document.getElementById('won-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeWonModal(); });
+document.getElementById('dispatch-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDispatchModal(); });
+document.getElementById('dispatch-modal-log').addEventListener('keydown', e => { if(e.key==='Enter') confirmDispatchModal(); });
+document.getElementById('won-po').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('won-due').focus(); });
+document.getElementById('won-due').addEventListener('keydown', e => { if(e.key==='Enter') confirmWon(); });
+</script>
