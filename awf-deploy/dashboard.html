@@ -176,6 +176,8 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 const PROXY = '/api/quotes-proxy';
+const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
 const APR_HIST = 315133;
 const ELEPHANT = 100000;
 const DAYS_IN_APR = 30;
@@ -302,9 +304,25 @@ async function loadLive() {
     const now = new Date();
     const today = now.getDate();
 
-    const res = await fetch(`${PROXY}?since=2026-04-17T00:00:00&limit=500`);
+    // Fetch quotes from proxy (full April)
+    const res = await fetch(`${PROXY}?since=2026-04-01T00:00:00&limit=500`);
     const allLive = await res.json();
     if (!Array.isArray(allLive)) throw new Error(JSON.stringify(allLive));
+
+    // Fetch shop_jobs to determine which quotes are won (a job in shop_jobs = won)
+    let wonQuoteIds = new Set();
+    try {
+      const sjRes = await fetch(`${SUPABASE_URL}/rest/v1/shop_jobs?select=quote_id`, {
+        headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` }
+      });
+      const shopJobs = sjRes.ok ? await sjRes.json() : [];
+      wonQuoteIds = new Set((Array.isArray(shopJobs) ? shopJobs : []).map(j => j.quote_id));
+    } catch(e) { console.warn('shop_jobs fetch failed', e); }
+
+    // Override won flag based on shop_jobs presence (quotes.id = shop_jobs.quote_id)
+    allLive.forEach(q => {
+      if (wonQuoteIds.has(q.id)) q.won = true;
+    });
 
     let aprLive=0, aprWon=0, aprOpen=0, aprOpenVal=0;
     const byMonth={};
@@ -375,7 +393,7 @@ async function loadLive() {
         <span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}%</span> vs last April · ${DAYS_IN_APR-today} days remaining
       </div>`;
 
-    document.getElementById('liveWonLine').textContent = `YTD thru Apr 16: $569K · Live Apr 17+: ${fmtK(aprWon)} won`;
+    document.getElementById('liveWonLine').textContent = `YTD thru Apr 16: $569K · Live Apr 1+: ${fmtK(aprWon)} won from quoting engine`;
 
   } catch(e) {
     document.getElementById('recentQuotes').innerHTML = `<div class="error-msg">Connection error: ${e.message}</div>`;
