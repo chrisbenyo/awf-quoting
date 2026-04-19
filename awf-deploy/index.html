@@ -437,8 +437,9 @@ table.bom select option{background:var(--surface2);}
   </div>
   <div class="shop-body">
     <div id="shop-pending-panel">
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="pending-search" class="sidebar-search" placeholder="🔍  Search PO, customer…" oninput="filterPendingList()" style="max-width:320px;margin-bottom:0;">
+        <button class="btn btn-ghost btn-sm" style="white-space:nowrap;border-color:var(--teal);color:var(--teal);" onclick="releaseAllDetails()">🏭 Release All Pending</button>
       </div>
       <div id="shop-pending-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
     </div>
@@ -973,16 +974,19 @@ function hrsLookup(thickVal){
 }
 function tubeLookup(type,h,w,wall){
   const table=type==='round'?RND_TUBE:(type==='square'?SQ_TUBE:RECT_TUBE);
+  // Normalize rect: table always stores larger dim first
+  const bigDim = type==='rect' ? Math.max(h,w) : h;
+  const smallDim = type==='rect' ? Math.min(h,w) : w;
   let best=null,bestScore=Infinity;
   for(const row of table){
-    const score=type==='round'?Math.abs(row[0]-h)+Math.abs(row[1]-wall):Math.abs(row[0]-h)+Math.abs(row[1]-w)+Math.abs(row[2]-wall);
+    const score=type==='round'?Math.abs(row[0]-bigDim)+Math.abs(row[1]-wall):Math.abs(row[0]-bigDim)+Math.abs(row[1]-smallDim)+Math.abs(row[2]-wall);
     if(score<bestScore){bestScore=score;best=row;}
   }
   if(!best) return null;
   const THRESHOLD=0.5;
   let poorMatch=false;
-  if(type==='round') poorMatch=Math.abs(best[0]-h)>THRESHOLD||Math.abs(best[1]-wall)>THRESHOLD;
-  else poorMatch=Math.abs(best[0]-h)>THRESHOLD||Math.abs(best[1]-w)>THRESHOLD||Math.abs(best[2]-wall)>THRESHOLD;
+  if(type==='round') poorMatch=Math.abs(best[0]-bigDim)>THRESHOLD||Math.abs(best[1]-wall)>THRESHOLD;
+  else poorMatch=Math.abs(best[0]-bigDim)>THRESHOLD||Math.abs(best[1]-smallDim)>THRESHOLD||Math.abs(best[2]-wall)>THRESHOLD;
   return{wt:best[best.length-1],poorMatch,matchDesc:type==='round'?`${best[0]}" OD × ${best[1]}" wall`:`${best[0]}"×${best[1]}" × ${best[2]}" wall`};
 }
 function angleLookup(leg1,leg2,thick){
@@ -1218,7 +1222,7 @@ let currentSortOrder='updated_at.desc';
 async function setSortOrder(val){ currentSortOrder=val; loadQuotes(); }
 async function loadQuotes(){
   const[col,dir]=currentSortOrder.split('.');
-  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,user_id,review_note,submitted_at,won,po_number,due_date').order(col,{ascending:dir==='asc',nullsFirst:false});
+  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,created_at,user_id,review_note,submitted_at,won,po_number,due_date,won_at').order(col,{ascending:dir==='asc',nullsFirst:false});
   if(filterStatus==='won') q=q.eq('won',true);
   else if(filterStatus!=='all') {
     q=q.eq('status',filterStatus);
@@ -1245,15 +1249,21 @@ function renderSidebar(){
     list.innerHTML=`<div style="padding:14px 10px;font-size:12px;color:var(--text3)">${term?'No matching quotes.':'No quotes yet.'}</div>`;
     return;
   }
-  list.innerHTML=filtered.map(q=>`
+  list.innerHTML=filtered.map(q=>{
+    const d=q.created_at?new Date(q.created_at):null;
+    const dateStr=d?`${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`:'';
+    return`
     <div class="quote-item${q.id===currentQuoteId?' active':''}" onclick="openQuote('${q.id}')">
       <div class="qi-num">#${q.number}${q.customer_quote_num ? ` <span style="font-size:9px;color:var(--text3)">${q.customer_quote_num}</span>` : ``}${q.po_number?` <span style="font-size:9px;color:var(--text3);font-family:var(--font)">${q.po_number}</span>`:''}</div>
       <div class="qi-customer">${q.customer_name||'No customer'}</div>
       <div class="qi-meta">
         <span><span class="sdot sdot-${q.status}"></span>${q.status}${q.won?' ✓ Won':''}</span>
-        <span>${fmt(q.total_price||0)}</span>
+        <span style="display:flex;gap:6px;align-items:center;">
+          ${dateStr?`<span style="color:var(--text3);font-size:10px;">${dateStr}</span>`:''}
+          <span>${fmt(q.total_price||0)}</span>
+        </span>
       </div>
-    </div>`).join('');
+    </div>`}).join('');
 }
 async function setFilter(f,el){
   filterStatus=f;
@@ -1281,7 +1291,7 @@ async function openQuote(id){
   const detailMap={};
   rawItems.forEach(row=>{
     const di=(row.item_data&&row.item_data.detail_idx!==undefined)?row.item_data.detail_idx:0;
-    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''};
+    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''};
     const d=detailMap[di];
     if(row.item_type==='detail_meta'){
       d.name=row.description||'';
@@ -1290,6 +1300,7 @@ async function openQuote(id){
       d.adjustment=row.item_data.adjustment||0;
       d.quantity=row.item_data.quantity||1;
       d.notes=row.item_data.notes||'';
+      d.detailOverridePrice=row.item_data.detailOverridePrice||'';
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
@@ -1305,7 +1316,7 @@ async function openQuote(id){
     }
   });
   details=Object.values(detailMap);
-  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''}];
+  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''}];
   activeDetailIdx=0;
   renderQuoteEditor(q);
   renderSidebar();
@@ -1314,7 +1325,7 @@ async function newQuote(){
   const{data,error}=await sbDB.from('quotes').insert({user_id:currentProfile.id,status:'draft'}).select().single();
   if(error){toast('Could not create quote','err');return;}
   quotes.unshift(data);
-  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''}];
+  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''}];
   quoteLevelItems=[];
   activeDetailIdx=0;
   currentQuoteId=data.id;
@@ -1520,7 +1531,7 @@ function renderDetailBody(locked){
         × <input type="text" data-id="${item.id}" data-field="cLength" value="${esc(item.cLength||'')}" placeholder="L" style="width:54px">
         <button tabindex="-1" class="mm-toggle${clu==='mm'?' active':''}" onclick="toggleUnit(${item.id},'cLengthUnit')">${clu.toUpperCase()}</button>`;
     } else {
-      dims=`<select data-id="${item.id}" data-field="tubeType" style="width:56px">
+      dims=`<select tabindex="-1" data-id="${item.id}" data-field="tubeType" style="width:56px">
           <option value="square"${tt==='square'?' selected':''}>Sq</option>
           <option value="rect"${tt==='rect'?' selected':''}>Rect</option>
           <option value="round"${tt==='round'?' selected':''}>Rnd</option>
@@ -1588,6 +1599,10 @@ function renderDetailBody(locked){
         <input type="number" min="0" value="${d.holes||0}" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].holes=this.value;recalcDetailDisplay()"></div>
       <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">ADJ %</label><br>
         <input type="number" value="${d.adjustment||0}" step="0.5" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].adjustment=this.value;recalcDetailDisplay()"></div>
+      <div style="display:flex;flex-direction:column;justify-content:flex-end;">
+        <label style="font-size:11px;color:var(--text2);font-family:var(--font);">SET $</label>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="openDetailOverride(${activeDetailIdx})">$ Set Price</button>
+      </div>
       <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">QTY OF DETAIL</label><br>
         <input type="number" value="${d.quantity||1}" min="1" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].quantity=this.value;recalcDetailDisplay()"></div>
     </div>
@@ -1597,12 +1612,19 @@ function renderDetailBody(locked){
 }
 
 function buildTotalsHTML(d,T){
+  const overrideRow=T.overrideActive
+    ? `<div class="total-item" style="border:1px solid var(--teal);border-radius:4px;padding:4px 8px;background:var(--teal-dim);">
+        <div class="total-item-label" style="color:var(--teal);">⚡ SET PRICE</div>
+        <div class="total-item-value" style="color:var(--teal);">${fmt(T.overrideVal)}</div>
+       </div>`
+    : '';
   return`<div class="detail-totals-grid">
     <div class="total-item"><div class="total-item-label">Material</div><div class="total-item-value">${fmt(T.matTotal)}</div></div>
     <div class="total-item"><div class="total-item-label">Miters (${d.miters||0})</div><div class="total-item-value">${fmt(T.miterCost)}</div></div>
     <div class="total-item"><div class="total-item-label">Holes (${d.holes||0})</div><div class="total-item-value">${fmt(T.holeCost)}</div></div>
     <div class="total-item"><div class="total-item-label">Other</div><div class="total-item-value">${fmt(T.otherTotal)}</div></div>
-    <div class="total-item"><div class="total-item-label">Subtotal</div><div class="total-item-value">${fmt(T.adjusted)}</div></div>
+    <div class="total-item"><div class="total-item-label">Subtotal</div><div class="total-item-value${T.overrideActive?' override-struck':''}"><span style="${T.overrideActive?'text-decoration:line-through;opacity:.45;':''}">${fmt(T.adjusted)}</span></div></div>
+    ${overrideRow}
     <div class="total-item"><div class="total-item-label">× ${T.qty} Detail(s)</div><div class="total-item-value big">${fmt(T.total)}</div></div>
     <div class="total-item"><div class="total-item-label">~Weight</div><div class="total-item-value wt">${fmtWt(T.totalWeight*T.qty)} lbs</div></div>
   </div>`;
@@ -1627,7 +1649,11 @@ function calcDetailTotal(d){
   const adj=parseFloat(d.adjustment)||0;
   const adjusted=subtotal*(1+adj/100);
   const qty=parseInt(d.quantity)||1;
-  return{matTotal,miterCost,holeCost,otherTotal,subtotal,adjusted,total:adjusted*qty,qty,totalWeight};
+  // Detail-level override price (per-detail unit, multiplied by qty)
+  const overrideVal=parseFloat(d.detailOverridePrice);
+  const overrideActive=d.detailOverridePrice!==''&&!isNaN(overrideVal);
+  const finalUnit=overrideActive?overrideVal:adjusted;
+  return{matTotal,miterCost,holeCost,otherTotal,subtotal,adjusted,total:finalUnit*qty,qty,totalWeight,overrideActive,overrideVal:overrideActive?overrideVal:null};
 }
 function calcGrandTotal(){
   let t=0;
@@ -1667,10 +1693,33 @@ function recalcDetailDisplay(){
 }
 
 // ============================================================
-// ADD / REMOVE ITEMS
+// DETAIL-LEVEL PRICE OVERRIDE
 // ============================================================
+function openDetailOverride(idx){
+  const d=details[idx];if(!d) return;
+  const T=calcDetailTotal(d);
+  const cur=d.detailOverridePrice!==''?fmt(parseFloat(d.detailOverridePrice)):'';
+  const calc=fmt(T.adjusted);
+  const msg=`Enter a flat price for this detail (per unit, before qty multiplier).\nCalculated subtotal: ${calc}${cur?' · Current override: '+cur:''}`;
+  const val=window.prompt(msg, d.detailOverridePrice!==''?parseFloat(d.detailOverridePrice).toFixed(2):'');
+  if(val===null) return; // cancelled
+  const trimmed=val.trim();
+  if(trimmed===''){
+    details[idx].detailOverridePrice='';
+    toast('Override cleared — using calculated price','ok');
+  } else {
+    const parsed=parseFloat(trimmed.replace(/[$,]/g,''));
+    if(isNaN(parsed)||parsed<0){toast('Invalid price — enter a number or leave blank to clear','err');return;}
+    details[idx].detailOverridePrice=parsed.toString();
+    toast(`Detail price set to ${fmt(parsed)}  ⚡`,'ok');
+  }
+  recalcDetailDisplay();
+  schedSave();
+}
+
+
 function addDetail(){
-  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:''});
+  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''});
   activeDetailIdx=details.length-1;
   renderDetailBar(false);renderDetailBody(false);saveItems();
 }
@@ -1909,7 +1958,7 @@ async function saveItems(){
   // Build all rows first, THEN delete+insert atomically
   const rows=[];let sort=0;
   details.forEach((d,di)=>{
-    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes}});
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||''}});
     d.items.forEach(item=>{
       const{unitPrice}=priceItem(item);
       const qty=parseInt(item.qty)||1;
@@ -2944,7 +2993,7 @@ async function loadPendingDispatch() {
 
   // 1. All won quotes with a PO number
   const { data: wonQuotes, error } = await sbDB.from('quotes')
-    .select('id,number,customer_name,po_number,due_date,won,status')
+    .select('id,number,customer_name,po_number,due_date,won,status,won_at')
     .eq('won', true);
   if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading quotes.</div>'; return; }
 
@@ -3162,7 +3211,7 @@ function filterActiveList() {
 // ── EDIT DISPATCHED DETAIL — standalone, no shopPendingData needed ──
 function editJobInline(jobId, detailNum, detailName, logNumber, rowEl) {
   rowEl.innerHTML = `
-    <td colspan="7" style="padding:10px 12px;">
+    <td colspan="10" style="padding:10px 12px;">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
         <span style="font-family:var(--font);font-size:12px;color:var(--text3);">Det. ${esc(detailNum)}</span>
         <input id="edit-name-${jobId}" value="${esc(detailName||'')}" placeholder="Detail name…"
@@ -3289,6 +3338,64 @@ async function dispatchDetail(ei, deti, editedName, logNumber) {
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
 
+async function releaseAllDetails() {
+  // Collect all un-dispatched details across all visible pending cards
+  const pending = shopPendingData.filter(entry =>
+    entry.details.some(d => !d.dispatched)
+  );
+  if (!pending.length) { toast('No pending details to release','err'); return; }
+
+  // Count total undispatched
+  let total = 0;
+  for (const entry of pending) total += entry.details.filter(d => !d.dispatched).length;
+
+  const confirmed = window.confirm(
+    `Release ALL ${total} pending detail${total!==1?'s':''} to the floor?\n\nLog numbers will be left blank (you can fill them in via Edit on the Active Jobs tab). Each detail will use its auto-detected station assignments.\n\nClick OK to proceed or Cancel to go back.`
+  );
+  if (!confirmed) return;
+
+  let released = 0, failed = 0;
+  for (const entry of pending) {
+    for (let deti = 0; deti < entry.details.length; deti++) {
+      const det = entry.details[deti];
+      if (det.dispatched) continue;
+      const q = entry.quote;
+      const detailName = det.meta ? (det.meta.description || det.meta.item_data?.detail_name || '') : '';
+      const allLineItems = [
+        ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
+        ...det.otherItems.map((item, idx) => ({...item, _sym: String(det.items.length+idx+1), _isOther: true}))
+      ];
+      const jobRec = {
+        quote_id:      q.id,
+        po_number:     q.po_number,
+        detail_number: det.detailNum,
+        detail_name:   detailName,
+        quantity:      det.meta?.item_data?.quantity || 1,
+        due_date:      q.due_date || null,
+        dispatched_by: currentProfile?.id || null,
+        log_number:    null
+      };
+      const { data: newJob, error: jobErr } = await sbDB.from('shop_jobs').insert(jobRec).select().single();
+      if (jobErr) { failed++; continue; }
+
+      const sawTypes = ['tube','angle','cchannel'];
+      const itemRecs = allLineItems.map((item, idx) => {
+        const defaultStation = item._isOther ? 'PURCHASED' : (sawTypes.includes(item.item_type) ? 'SAW' : 'BURN');
+        const desc = item._isOther
+          ? (item.description || 'Other item')
+          : formatItemForReport(item.item_data ? {...item.item_data, type: item.item_type} : item);
+        return { shop_job_id: newJob.id, item_sym: item._sym, description: desc, quantity: item.qty||1, station_assignment: defaultStation };
+      });
+      if (itemRecs.length) await sbDB.from('shop_job_items').insert(itemRecs);
+      released++;
+    }
+  }
+
+  if (failed) toast(`Released ${released} detail${released!==1?'s':''}. ${failed} failed — check console.`, 'err');
+  else toast(`✓ Released all ${released} detail${released!==1?'s':''} to floor. Add log numbers on Active Jobs tab.`, 'ok');
+  await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
+}
+
 let activeJobsSort = { col: 'due_date', dir: 'asc' };
 
 async function loadActiveJobs() {
@@ -3305,12 +3412,12 @@ async function loadActiveJobs() {
     return;
   }
 
-  // Get customer names from quotes table via quote_id
+  // Get customer names AND won_at from quotes table via quote_id
   const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
-  const customerMap = {};
+  const quoteInfoMap = {};
   for (const qid of quoteIds) {
-    const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
-    if (q) customerMap[qid] = q.customer_name || '—';
+    const {data:q} = await sbDB.from('quotes').select('id,customer_name,won_at').eq('id',qid).single();
+    if (q) quoteInfoMap[qid] = { customer: q.customer_name || '—', won_at: q.won_at || null };
   }
 
   // Get latest event per job for current stage
@@ -3318,9 +3425,6 @@ async function loadActiveJobs() {
     .select('shop_job_id,station,event_type,created_at')
     .order('created_at', {ascending: false});
 
-  // Compute current stage per job:
-  // - If most recent event is a checkin → currently AT that station
-  // - If most recent event is a checkout → show station with ✓ (completed, between stations)
   const stageMap = {};
   for (const ev of (events||[])) {
     if (!stageMap[ev.shop_job_id]) {
@@ -3331,12 +3435,14 @@ async function loadActiveJobs() {
     }
   }
 
-  // Enrich jobs with customer and stage
+  // Enrich jobs with customer, won_at, and stage
   const enriched = jobs.map(job => {
     const s = stageMap[job.id];
+    const info = quoteInfoMap[job.quote_id] || {};
     return {
       ...job,
-      customer: customerMap[job.quote_id] || '—',
+      customer: info.customer || '—',
+      won_at: info.won_at || null,
       stage: s ? s.station : 'DISPATCHED',
       stageActive: s ? s.active : false
     };
@@ -3346,7 +3452,7 @@ async function loadActiveJobs() {
   const {col, dir} = activeJobsSort;
   enriched.sort((a, b) => {
     let av = a[col] || ''; let bv = b[col] || '';
-    if (col === 'due_date') { av = av||'9999'; bv = bv||'9999'; }
+    if (col === 'due_date' || col === 'won_at') { av = av||'9999'; bv = bv||'9999'; }
     const cmp = av < bv ? -1 : av > bv ? 1 : 0;
     return dir === 'asc' ? cmp : -cmp;
   });
@@ -3356,6 +3462,8 @@ async function loadActiveJobs() {
     const arrow = active ? (activeJobsSort.dir === 'asc' ? ' ↑' : ' ↓') : '';
     return `<th style="cursor:pointer;user-select:none;${active?'color:var(--teal);':''}" onclick="sortActiveJobs('${colKey}')">${label}${arrow}</th>`;
   }
+
+  const ALL_STAGES = ['DISPATCHED','SAW','BURN','PURCHASED','FIT','WELD','CLEAN','PRIME','SANDBLAST','SHIP'];
 
   // Store for filtering
   _activeRows = enriched;
@@ -3369,6 +3477,7 @@ async function loadActiveJobs() {
       ${thBtn('Description','detail_name')}
       <th>Qty</th>
       ${thBtn('Log #','log_number')}
+      ${thBtn('Won','won_at')}
       ${thBtn('Due Date','due_date')}
       ${thBtn('Stage','stage')}
       <th></th>
@@ -3376,6 +3485,8 @@ async function loadActiveJobs() {
     <tbody>
       ${enriched.map(job => {
         const dueLabel = formatDueDate(job.due_date);
+        const wonLabel = job.won_at ? (() => { const d=new Date(job.won_at); return `${d.getMonth()+1}/${d.getDate()}`; })() : '—';
+        const stageOpts = ALL_STAGES.map(s=>`<option value="${s}"${s===job.stage?' selected':''}>${s}</option>`).join('');
         return `<tr id="jobrow-${job.id}">
           <td style="font-family:var(--font);color:var(--amber);white-space:nowrap;">${esc(job.po_number)}</td>
           <td style="font-size:12px;">${esc(job.customer)}</td>
@@ -3383,10 +3494,14 @@ async function loadActiveJobs() {
           <td style="font-size:12px;color:var(--text2);">${esc(job.detail_name||'—')}</td>
           <td style="text-align:center;font-family:var(--font);">${job.quantity||1}</td>
           <td style="font-family:var(--font);font-size:12px;${job.log_number?'color:var(--amber);':'color:var(--red);font-style:italic;'}">${esc(job.log_number||'missing')}</td>
+          <td style="font-family:var(--font);font-size:11px;color:var(--text3);white-space:nowrap;">${wonLabel}</td>
           <td style="white-space:nowrap;"><span class="dispatch-due ${dueLabel.cls}" style="font-size:11px;">${dueLabel.text}</span></td>
-          <td><span class="stage-badge stage-${job.stage}" style="${!job.stageActive&&job.stage!=='DISPATCHED'?'opacity:.6;':''}">
-            ${job.stageActive ? '⬤ ' : job.stage!=='DISPATCHED' ? '✓ ' : ''}${job.stage}
-          </span></td>
+          <td>
+            <select class="stage-select" style="font-size:11px;padding:2px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);"
+              onchange="updateJobStage('${job.id}',this.value)">
+              ${stageOpts}
+            </select>
+          </td>
           <td><button class="btn btn-ghost btn-sm" style="font-size:11px;white-space:nowrap;"
             onclick="editJobInline('${job.id}','${esc(job.detail_number)}','${esc(job.detail_name||'')}','${esc(job.log_number||'')}',this.closest('tr'))">Edit</button></td>
         </tr>`;
@@ -3394,6 +3509,21 @@ async function loadActiveJobs() {
     </tbody>
   </table>`;
 }
+
+async function updateJobStage(jobId, newStation) {
+  // Insert a synthetic checkin event to move the job to the chosen stage
+  const { error } = await sbDB.from('shop_events').insert({
+    shop_job_id: jobId,
+    station: newStation,
+    event_type: 'checkin',
+    operator_name: 'Office',
+    notes: 'Stage updated from office'
+  });
+  if (error) { toast('Stage update error: ' + error.message, 'err'); await loadActiveJobs(); return; }
+  toast(`Moved to ${newStation} ✓`, 'ok');
+  await loadActiveJobs();
+}
+
 
 function sortActiveJobs(col) {
   if (activeJobsSort.col === col) {
@@ -3406,8 +3536,11 @@ function sortActiveJobs(col) {
 
 
 function formatDueDate(dateStr) {
-  if (!dateStr) return { text: 'No due date', cls: '' };
-  const due = new Date(dateStr + 'T12:00:00');
+  if (!dateStr || !dateStr.trim()) return { text: 'No due date', cls: '' };
+  // Strip to YYYY-MM-DD whether a date-only or full ISO string was stored
+  const datePart = dateStr.substring(0, 10);
+  const due = new Date(datePart + 'T12:00:00');
+  if (isNaN(due.getTime())) return { text: 'Invalid date', cls: '' };
   const today = new Date(); today.setHours(0,0,0,0);
   const diff = Math.round((due - today) / 86400000);
   const label = due.toLocaleDateString('en-US', {month:'numeric', day:'numeric'});
