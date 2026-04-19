@@ -439,7 +439,6 @@ table.bom select option{background:var(--surface2);}
     <div id="shop-pending-panel">
       <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="pending-search" class="sidebar-search" placeholder="🔍  Search PO, customer…" oninput="filterPendingList()" style="max-width:320px;margin-bottom:0;">
-        <button class="btn btn-ghost btn-sm" style="white-space:nowrap;border-color:var(--teal);color:var(--teal);" onclick="releaseAllDetails()">🏭 Release All Pending</button>
       </div>
       <div id="shop-pending-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
     </div>
@@ -3073,13 +3072,19 @@ async function loadPendingDispatch() {
     const dueLabel = formatDueDate(q.due_date);
     const pendingCount = entry.details.filter(d => !d.dispatched).length;
     const totalCount   = entry.details.length;
+    const wonDateStr = q.won_at ? (() => { const d=new Date(q.won_at); return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; })() : '—';
+    const dueDateStr = q.due_date ? formatDueDate(q.due_date).text : '—';
     return `
     <div class="dispatch-card" id="dcard-${ei}">
       <div class="dispatch-card-hdr" onclick="toggleDispatchCard(${ei})">
         <span class="dispatch-po">PO: ${esc(q.po_number)}</span>
         <span class="dispatch-customer">${esc(q.customer_name||'—')}</span>
-        <span class="dispatch-due ${dueLabel.cls}">${dueLabel.text}</span>
+        <div style="display:flex;gap:10px;align-items:center;font-family:var(--font);font-size:11px;">
+          <span style="color:var(--text3);">Won: <span style="color:var(--text2);">${wonDateStr}</span></span>
+          <span style="color:var(--text3);">Due: <span class="${dueLabel.cls}" style="font-weight:500;">${dueDateStr}</span></span>
+        </div>
         <span class="dispatch-detail-count">${pendingCount} of ${totalCount} detail${totalCount!==1?'s':''} pending ▾</span>
+        ${pendingCount > 1 ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="event.stopPropagation();releaseAllForPO(${ei})">🏭 Release All (${pendingCount})</button>` : ''}
       </div>
       <div class="dispatch-body" id="dbody-${ei}">
         ${entry.details.map((det, deti) => renderDetailDispatchRow(q, det, ei, deti)).join('')}
@@ -3338,61 +3343,54 @@ async function dispatchDetail(ei, deti, editedName, logNumber) {
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
 
-async function releaseAllDetails() {
-  // Collect all un-dispatched details across all visible pending cards
-  const pending = shopPendingData.filter(entry =>
-    entry.details.some(d => !d.dispatched)
-  );
-  if (!pending.length) { toast('No pending details to release','err'); return; }
+async function releaseAllForPO(ei) {
+  const entry = shopPendingData[ei];
+  if (!entry) return;
+  const pending = entry.details.filter(d => !d.dispatched);
+  if (!pending.length) { toast('No pending details for this PO','err'); return; }
 
-  // Count total undispatched
-  let total = 0;
-  for (const entry of pending) total += entry.details.filter(d => !d.dispatched).length;
-
+  const q = entry.quote;
   const confirmed = window.confirm(
-    `Release ALL ${total} pending detail${total!==1?'s':''} to the floor?\n\nLog numbers will be left blank (you can fill them in via Edit on the Active Jobs tab). Each detail will use its auto-detected station assignments.\n\nClick OK to proceed or Cancel to go back.`
+    `Release all ${pending.length} pending detail${pending.length!==1?'s':''} for PO ${q.po_number} to the floor?\n\nLog numbers will be left blank — fill them in via Edit on the Active Jobs tab.\n\nClick OK to proceed.`
   );
   if (!confirmed) return;
 
   let released = 0, failed = 0;
-  for (const entry of pending) {
-    for (let deti = 0; deti < entry.details.length; deti++) {
-      const det = entry.details[deti];
-      if (det.dispatched) continue;
-      const q = entry.quote;
-      const detailName = det.meta ? (det.meta.description || det.meta.item_data?.detail_name || '') : '';
-      const allLineItems = [
-        ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
-        ...det.otherItems.map((item, idx) => ({...item, _sym: String(det.items.length+idx+1), _isOther: true}))
-      ];
-      const jobRec = {
-        quote_id:      q.id,
-        po_number:     q.po_number,
-        detail_number: det.detailNum,
-        detail_name:   detailName,
-        quantity:      det.meta?.item_data?.quantity || 1,
-        due_date:      q.due_date || null,
-        dispatched_by: currentProfile?.id || null,
-        log_number:    null
-      };
-      const { data: newJob, error: jobErr } = await sbDB.from('shop_jobs').insert(jobRec).select().single();
-      if (jobErr) { failed++; continue; }
+  for (let deti = 0; deti < entry.details.length; deti++) {
+    const det = entry.details[deti];
+    if (det.dispatched) continue;
+    const detailName = det.meta ? (det.meta.description || det.meta.item_data?.detail_name || '') : '';
+    const allLineItems = [
+      ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
+      ...det.otherItems.map((item, idx) => ({...item, _sym: String(det.items.length+idx+1), _isOther: true}))
+    ];
+    const jobRec = {
+      quote_id:      q.id,
+      po_number:     q.po_number,
+      detail_number: det.detailNum,
+      detail_name:   detailName,
+      quantity:      det.meta?.item_data?.quantity || 1,
+      due_date:      q.due_date || null,
+      dispatched_by: currentProfile?.id || null,
+      log_number:    null
+    };
+    const { data: newJob, error: jobErr } = await sbDB.from('shop_jobs').insert(jobRec).select().single();
+    if (jobErr) { failed++; continue; }
 
-      const sawTypes = ['tube','angle','cchannel'];
-      const itemRecs = allLineItems.map((item, idx) => {
-        const defaultStation = item._isOther ? 'PURCHASED' : (sawTypes.includes(item.item_type) ? 'SAW' : 'BURN');
-        const desc = item._isOther
-          ? (item.description || 'Other item')
-          : formatItemForReport(item.item_data ? {...item.item_data, type: item.item_type} : item);
-        return { shop_job_id: newJob.id, item_sym: item._sym, description: desc, quantity: item.qty||1, station_assignment: defaultStation };
-      });
-      if (itemRecs.length) await sbDB.from('shop_job_items').insert(itemRecs);
-      released++;
-    }
+    const sawTypes = ['tube','angle','cchannel'];
+    const itemRecs = allLineItems.map((item) => {
+      const defaultStation = item._isOther ? 'PURCHASED' : (sawTypes.includes(item.item_type) ? 'SAW' : 'BURN');
+      const desc = item._isOther
+        ? (item.description || 'Other item')
+        : formatItemForReport(item.item_data ? {...item.item_data, type: item.item_type} : item);
+      return { shop_job_id: newJob.id, item_sym: item._sym, description: desc, quantity: item.qty||1, station_assignment: defaultStation };
+    });
+    if (itemRecs.length) await sbDB.from('shop_job_items').insert(itemRecs);
+    released++;
   }
 
-  if (failed) toast(`Released ${released} detail${released!==1?'s':''}. ${failed} failed — check console.`, 'err');
-  else toast(`✓ Released all ${released} detail${released!==1?'s':''} to floor. Add log numbers on Active Jobs tab.`, 'ok');
+  if (failed) toast(`Released ${released}. ${failed} failed.`, 'err');
+  else toast(`✓ PO ${q.po_number} — all ${released} detail${released!==1?'s':''} released to floor`, 'ok');
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
 
