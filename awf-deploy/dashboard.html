@@ -43,7 +43,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 .chart-row{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:20px;}
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
 .card-title{font-size:11px;color:var(--text3);font-family:var(--font);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px;}
-.bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;}
+.bottom-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:20px;}
 
 .win-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;cursor:pointer;}
 .win-card:hover{border-color:var(--border2);}
@@ -166,6 +166,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
+    <div class="card-title">Won volume by month</div>
+    <div class="leg-row">
+      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>historical</span>
+      <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>live</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text3);">| = avg</span>
+    </div>
+    <div id="wonMonthRows" style="max-height:280px;overflow-y:auto;"></div>
+  </div>
+
+  <div class="card">
     <div class="card-title" id="paceTitle">April pace</div>
     <div id="paceContent"><div class="empty-state">Loading...</div></div>
   </div>
@@ -268,11 +278,11 @@ CUSTS.forEach(c => {
   tb.appendChild(tr);
 });
 
-// Weekly won — all from spreadsheet through 4/13, live from 4/20+ via won_at
+// Weekly won — from spreadsheet through 4/13, live from 4/20+ via won_at
 const WKS_HIST = [
-  {label:'1/20',v:51276},{label:'1/27',v:35513},
-  {label:'2/3',v:17028},{label:'2/10',v:51198},{label:'2/17',v:49928},{label:'2/24',v:109487},
-  {label:'3/3',v:35774},{label:'3/10',v:49350},{label:'3/17',v:34312},{label:'3/24',v:21505},
+  {label:'1/6',v:15539},{label:'1/13',v:9945},{label:'1/19',v:47885},{label:'1/26',v:14003},
+  {label:'2/2',v:63616},{label:'2/9',v:16281},{label:'2/16',v:68803},{label:'2/23',v:57215},
+  {label:'3/2',v:45809},{label:'3/9',v:40626},{label:'3/16',v:29884},{label:'3/23',v:21505},
   {label:'3/30',v:55680},{label:'4/6',v:35751},{label:'4/13',v:26500},
 ];
 const wDiv=document.getElementById('weeklyRows');
@@ -296,6 +306,44 @@ function buildWeeklyChart(weeks) {
 buildWeeklyChart(WKS_HIST);
 
 buildChart(0,[]);
+
+
+// Won volume by month — Jan 2025 through Mar 2026 from spreadsheet, Apr 2026+ live
+const WON_MONTH_HIST = [
+  {label:'Jan 25',v:131459},{label:'Feb 25',v:188272},{label:'Mar 25',v:223991},
+  {label:'Apr 25',v:174415},{label:'May 25',v:230741},{label:'Jun 25',v:143309},
+  {label:'Jul 25',v:147676},{label:'Aug 25',v:156113},{label:'Sep 25',v:166444},
+  {label:'Oct 25',v:193575},{label:'Nov 25',v:108123},{label:'Dec 25',v:211512},
+  {label:'Jan 26',v:133884},{label:'Feb 26',v:200335},{label:'Mar 26',v:170833},
+];
+function buildWonMonthChart(liveMonthMap) {
+  const el = document.getElementById('wonMonthRows');
+  if(!el) return;
+  el.innerHTML='';
+  // Merge historical with live
+  const liveEntries = Object.entries(liveMonthMap).map(([k,v])=>{
+    const [yr,mo]=k.split('-');
+    const d=new Date(+yr,+mo-1,1);
+    return {label:d.toLocaleString('default',{month:'short'})+' '+String(yr).slice(2),v};
+  });
+  const all=[...WON_MONTH_HIST,...liveEntries];
+  const maxV=Math.max(...all.map(m=>m.v),1);
+  const avg=Math.round(all.reduce((s,m)=>s+m.v,0)/all.length);
+  all.forEach(m=>{
+    const pct=(m.v/maxV)*100, apct=Math.min(100,(avg/maxV)*100);
+    const isLive=liveEntries.some(l=>l.label===m.label);
+    const c=isLive?'#2dd4bf':'#185FA5';
+    const r=document.createElement('div'); r.className='wk-row';
+    r.innerHTML=`<span class="wk-label" style="width:42px;font-size:9px;">${m.label}</span>
+      <div class="wk-bar-wrap">
+        <div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
+        <div style="position:absolute;left:${apct}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.4;"></div>
+      </div>
+      <span class="wk-val" style="width:52px;">${fmtK(m.v)}</span>`;
+    el.appendChild(r);
+  });
+}
+buildWonMonthChart({});
 
 async function loadLive() {
   try {
@@ -328,9 +376,9 @@ async function loadLive() {
     });
     buildChart(aprLive, extraMonths);
 
-    // Weekly won from 4/20+ using won_at — weeks before that are hardcoded above
+    // Weekly won from 4/20+ using won_at
     const wonByWeekMap={};
-    const liveStart=new Date(2026,3,20); // Apr 20
+    const liveStart=new Date(2026,3,20);
     let cur=new Date(liveStart);
     while(cur<=new Date()){
       const k=`${cur.getMonth()+1}/${cur.getDate()}`;
@@ -346,6 +394,15 @@ async function loadLive() {
       if(k in wonByWeekMap) wonByWeekMap[k]+=q.total_price||0;
     });
     buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
+
+    // Won by month tile
+    const wonMonthMap={};
+    allLive.filter(q=>q.won && q.won_at).forEach(q=>{
+      const d=new Date(q.won_at);
+      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      wonMonthMap[k]=(wonMonthMap[k]||0)+(q.total_price||0);
+    });
+    buildWonMonthChart(wonMonthMap);
 
     const aprTotal = aprLive;
     const pace = aprTotal / (today/DAYS_IN_APR);
