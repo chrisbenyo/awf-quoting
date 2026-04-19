@@ -3,11 +3,11 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY || "sb_publishable_jZ2wGIvrlQqM3hy
 
 export default async (req) => {
   const url = new URL(req.url);
-  const since = url.searchParams.get("since") ?? "2026-04-17T00:00:00";
+  const since = url.searchParams.get("since") ?? "2026-04-01T00:00:00";
   const limit = url.searchParams.get("limit") ?? "500";
   try {
     const sbRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,created_at,status,won,po_number&created_at=gte.${since}&order=created_at.desc&limit=${limit}`,
+      `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,created_at,won_at,status,won,po_number&created_at=gte.${since}&order=created_at.desc&limit=${limit}`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     const data = await sbRes.json();
