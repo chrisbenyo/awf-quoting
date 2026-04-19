@@ -148,19 +148,16 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Weekly sales won (2026)</div>
+    <div class="card-title">Weekly won — Apr 2026 (live)</div>
     <div class="leg-row">
-      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2026</span>
-      <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2025</span>
+      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>below goal</span>
+      <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
       <span style="margin-left:auto;font-size:10px;color:var(--text3);">| = $52K goal</span>
     </div>
     <div id="weeklyRows"></div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
-      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;font-family:var(--font);">
-        <span style="color:var(--text3);">13-wk avg</span><span>$37,324</span>
-      </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--font);">
-        <span style="color:var(--text3);">YTD won thru Apr 16</span><span>$569K</span>
+        <span style="color:var(--text3);">goal</span><span>$52K/wk</span>
       </div>
     </div>
   </div>
@@ -226,9 +223,9 @@ function buildChart(aprLive, extraMonths) {
   vc = new Chart(document.getElementById('volChart'), {
     type:'bar',
     data:{ labels, datasets:[
-      {label:'Historical',data:hist,backgroundColor:'#185FA5',borderRadius:2},
-      {label:'Live',data:live,backgroundColor:'#2dd4bf',borderRadius:2},
-      {label:'Prior year',data:prior,backgroundColor:'#2e3248',borderRadius:2},
+      {label:'Historical',data:hist,backgroundColor:'#185FA5',borderRadius:2,stack:'vol'},
+      {label:'Live',data:live,backgroundColor:'#2dd4bf',borderRadius:2,stack:'vol'},
+      {label:'Prior year',data:prior,backgroundColor:'#2e3248',borderRadius:2,stack:'prior'},
       {label:'Avg',data:Array(labels.length).fill(935968),type:'line',borderColor:'#4ade80',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false}
     ]},
     options:{
@@ -236,7 +233,7 @@ function buildChart(aprLive, extraMonths) {
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+fmtK(c.raw||0)}}},
       scales:{
         x:{ticks:{color:'#5a5d72',font:{size:10},autoSkip:false,maxRotation:0},grid:{display:false}},
-        y:{ticks:{color:'#5a5d72',font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(46,50,72,0.8)'}}
+        y:{stacked:true,ticks:{color:'#5a5d72',font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(46,50,72,0.8)'}}
       }
     }
   });
@@ -271,31 +268,31 @@ CUSTS.forEach(c => {
   tb.appendChild(tr);
 });
 
-const WKS = [
-  {w:'1/20',v:51276,p:25000},{w:'1/27',v:35513,p:35000},{w:'2/3',v:17028,p:51276},
-  {w:'2/10',v:51198,p:35513},{w:'2/17',v:49928,p:17028},{w:'2/24',v:109487,p:51198},
-  {w:'3/3',v:35774,p:49928},{w:'3/10',v:49350,p:109487},{w:'3/17',v:34312,p:35774},
-  {w:'3/24',v:95912,p:49350},{w:'4/1',v:171698,p:34312},{w:'4/7',v:30007,p:95912},
-  {w:'4/14',v:30654,p:171698},
-];
-const maxW=171698,gl=51923;
+// Weekly won chart built dynamically in loadLive()
 const wDiv=document.getElementById('weeklyRows');
-WKS.forEach(w=>{
-  const p26=(w.v/maxW)*100,p25=(w.p/maxW)*100,gp=(gl/maxW)*100;
-  const c26=w.v>=gl?'#4ade80':'#185FA5';
-  const yoy=((w.v-w.p)/w.p*100);
-  const yc=yoy>=0?'#4ade80':'#f87171';
-  const r=document.createElement('div'); r.className='wk-row';
-  r.innerHTML=`<span class="wk-label">${w.w}</span>
-    <div class="wk-bar-wrap">
-      <div class="wk-bar" style="width:${p25}%;background:#2e3248;"></div>
-      <div class="wk-bar" style="width:${p26}%;background:${c26};opacity:.85;"></div>
-      <div style="position:absolute;left:${gp}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.5;"></div>
-    </div>
-    <span class="wk-val">${fmtK(w.v)}</span>
-    <span class="wk-yoy" style="color:${yc};">${yoy>=0?'+':''}${Math.round(yoy)}%</span>`;
-  wDiv.appendChild(r);
-});
+function buildWeeklyChart(wonByWeek) {
+  wDiv.innerHTML = '';
+  if (!wonByWeek.length) {
+    wDiv.innerHTML = '<div class="empty-state">No won quotes yet from quoting engine.</div>';
+    return;
+  }
+  const maxV = Math.max(...wonByWeek.map(w=>w.v), 1);
+  const gl = 52000; // weekly goal
+  wonByWeek.forEach(w => {
+    const pct = (w.v/maxV)*100;
+    const gpct = Math.min(100,(gl/maxV)*100);
+    const c = w.v>=gl?'#4ade80':'#185FA5';
+    const r = document.createElement('div'); r.className='wk-row';
+    r.innerHTML=`<span class="wk-label">${w.label}</span>
+      <div class="wk-bar-wrap">
+        <div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
+        <div style="position:absolute;left:${gpct}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.5;"></div>
+      </div>
+      <span class="wk-val">${fmtK(w.v)}</span>`;
+    wDiv.appendChild(r);
+  });
+}
+buildWeeklyChart([]);
 
 buildChart(0,[]);
 
@@ -346,6 +343,33 @@ async function loadLive() {
     });
     buildChart(aprLive, extraMonths);
 
+    // Build Monday-anchored weekly won chart from 4/6 forward
+    const wonByWeekMap = {};
+    // Generate Monday anchors from 4/6 through current week
+    const startMon = new Date(2026, 3, 6); // Apr 6
+    const nowDate = new Date();
+    let cursor = new Date(startMon);
+    while (cursor <= nowDate) {
+      const key = `${cursor.getMonth()+1}/${cursor.getDate()}`;
+      wonByWeekMap[key] = 0;
+      cursor.setDate(cursor.getDate() + 7);
+    }
+    // Accumulate won quote values into Monday weeks
+    allLive.filter(q=>q.won).forEach(q => {
+      const d = new Date(q.created_at);
+      if (d < startMon) return;
+      const day = d.getDay();
+      const diff = (day === 0) ? -6 : 1 - day;
+      const mon = new Date(d);
+      mon.setDate(d.getDate() + diff);
+      mon.setHours(0,0,0,0);
+      if (mon < startMon) return;
+      const key = `${mon.getMonth()+1}/${mon.getDate()}`;
+      if (key in wonByWeekMap) wonByWeekMap[key] += q.total_price || 0;
+    });
+    const wonWeekArr = Object.entries(wonByWeekMap).map(([label,v])=>({label,v}));
+    buildWeeklyChart(wonWeekArr);
+
     const aprTotal = APR_HIST + aprLive;
     const pace = aprTotal / (today/DAYS_IN_APR);
     const pctVsLast = ((pace-940111)/940111*100);
@@ -358,7 +382,7 @@ async function loadLive() {
     document.getElementById('m3val').textContent = aprOpen;
     document.getElementById('m3sub').textContent = `${fmtK(aprOpenVal)} open value`;
 
-    const recent = allLive.filter(q=>{const d=new Date(q.created_at);return d.getFullYear()===2026&&d.getMonth()===3;}).slice(0,8);
+    const recent = allLive.filter(q=>{const d=new Date(q.created_at);return d.getFullYear()===2026&&d.getMonth()===3;}).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,8);
     document.getElementById('recentQuotes').innerHTML = recent.length===0
       ? `<div class="empty-state">No quotes entered in quoting engine yet today.<br>Enter a quote at quotes.allweldfab.com and it'll appear here.</div>`
       : recent.map(q=>{
