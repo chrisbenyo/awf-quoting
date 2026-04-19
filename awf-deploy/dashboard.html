@@ -268,12 +268,12 @@ CUSTS.forEach(c => {
   tb.appendChild(tr);
 });
 
-// Weekly won — Jan-Mar from spreadsheet, Apr 1+ live using won_at date
+// Weekly won — all from spreadsheet through 4/13, live from 4/20+ via won_at
 const WKS_HIST = [
-  {label:'1/5',v:0},{label:'1/12',v:0},{label:'1/20',v:51276},{label:'1/27',v:35513},
+  {label:'1/20',v:51276},{label:'1/27',v:35513},
   {label:'2/3',v:17028},{label:'2/10',v:51198},{label:'2/17',v:49928},{label:'2/24',v:109487},
-  {label:'3/3',v:35774},{label:'3/10',v:49350},{label:'3/17',v:34312},{label:'3/24',v:95912},
-  {label:'3/31',v:171698},
+  {label:'3/3',v:35774},{label:'3/10',v:49350},{label:'3/17',v:34312},{label:'3/24',v:21505},
+  {label:'3/30',v:55680},{label:'4/6',v:35751},{label:'4/13',v:26500},
 ];
 const wDiv=document.getElementById('weeklyRows');
 function buildWeeklyChart(weeks) {
@@ -328,10 +328,10 @@ async function loadLive() {
     });
     buildChart(aprLive, extraMonths);
 
-    // Weekly won from Apr 1+, Monday-anchored, keyed on won_at (the date you clicked Won)
+    // Weekly won from 4/20+ using won_at — weeks before that are hardcoded above
     const wonByWeekMap={};
-    const startMon=new Date(2026,3,1); // Apr 1 — first Monday of live tracking
-    let cur=new Date(2026,2,30); // Mar 30 = Monday before Apr 1
+    const liveStart=new Date(2026,3,20); // Apr 20
+    let cur=new Date(liveStart);
     while(cur<=new Date()){
       const k=`${cur.getMonth()+1}/${cur.getDate()}`;
       wonByWeekMap[k]=0;
@@ -339,14 +339,13 @@ async function loadLive() {
     }
     allLive.filter(q=>q.won && q.won_at).forEach(q=>{
       const d=new Date(q.won_at);
+      if(d<liveStart)return;
       const day=d.getDay(), diff=day===0?-6:1-day;
       const mon=new Date(d); mon.setDate(d.getDate()+diff); mon.setHours(0,0,0,0);
       const k=`${mon.getMonth()+1}/${mon.getDate()}`;
       if(k in wonByWeekMap) wonByWeekMap[k]+=q.total_price||0;
     });
-    // Convert to array, label Apr weeks clearly, skip empty pre-Apr weeks
-    const liveWeeks=Object.entries(wonByWeekMap).map(([label,v])=>({label,v}));
-    buildWeeklyChart([...WKS_HIST,...liveWeeks]);
+    buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
 
     const aprTotal = aprLive;
     const pace = aprTotal / (today/DAYS_IN_APR);
