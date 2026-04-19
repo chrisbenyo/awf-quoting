@@ -166,13 +166,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Won volume by month</div>
+    <div class="card-title">Won by month — YoY</div>
     <div class="leg-row">
-      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>historical</span>
-      <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>live</span>
-      <span style="margin-left:auto;font-size:10px;color:var(--text3);">| = avg</span>
+      <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
+      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2026 hist</span>
+      <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>2026 live</span>
     </div>
-    <div id="wonMonthRows" style="max-height:280px;overflow-y:auto;"></div>
+    <div id="wonMonthRows" style="overflow-y:auto;max-height:260px;"></div>
   </div>
 
   <div class="card">
@@ -278,7 +278,7 @@ CUSTS.forEach(c => {
   tb.appendChild(tr);
 });
 
-// Weekly won — from spreadsheet through 4/13, live from 4/20+ via won_at
+// Weekly won — spreadsheet through 4/13, live from 4/20+ via won_at
 const WKS_HIST = [
   {label:'1/6',v:15539},{label:'1/13',v:9945},{label:'1/19',v:47885},{label:'1/26',v:14003},
   {label:'2/2',v:63616},{label:'2/9',v:16281},{label:'2/16',v:68803},{label:'2/23',v:57215},
@@ -308,42 +308,52 @@ buildWeeklyChart(WKS_HIST);
 buildChart(0,[]);
 
 
-// Won volume by month — Jan 2025 through Mar 2026 from spreadsheet, Apr 2026+ live
-const WON_MONTH_HIST = [
-  {label:'Jan 25',v:131459},{label:'Feb 25',v:188272},{label:'Mar 25',v:223991},
-  {label:'Apr 25',v:174415},{label:'May 25',v:230741},{label:'Jun 25',v:143309},
-  {label:'Jul 25',v:147676},{label:'Aug 25',v:156113},{label:'Sep 25',v:166444},
-  {label:'Oct 25',v:193575},{label:'Nov 25',v:108123},{label:'Dec 25',v:211512},
-  {label:'Jan 26',v:133884},{label:'Feb 26',v:200335},{label:'Mar 26',v:170833},
-];
-function buildWonMonthChart(liveMonthMap) {
+// Won volume by month — YoY grouped (Jan–Dec), with 2025 and 2026 side by side
+const WON_MONTHS_2025 = [131459,188272,223991,174415,230741,143309,147676,156113,166444,193575,108123,211512];
+const WON_MONTHS_2026_HIST = [133884,200335,170833]; // Jan–Mar 2026 from spreadsheet
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function buildWonMonthChart(aprLiveWon) {
   const el = document.getElementById('wonMonthRows');
   if(!el) return;
   el.innerHTML='';
-  // Merge historical with live
-  const liveEntries = Object.entries(liveMonthMap).map(([k,v])=>{
-    const [yr,mo]=k.split('-');
-    const d=new Date(+yr,+mo-1,1);
-    return {label:d.toLocaleString('default',{month:'short'})+' '+String(yr).slice(2),v};
-  });
-  const all=[...WON_MONTH_HIST,...liveEntries];
-  const maxV=Math.max(...all.map(m=>m.v),1);
-  const avg=Math.round(all.reduce((s,m)=>s+m.v,0)/all.length);
-  all.forEach(m=>{
-    const pct=(m.v/maxV)*100, apct=Math.min(100,(avg/maxV)*100);
-    const isLive=liveEntries.some(l=>l.label===m.label);
-    const c=isLive?'#2dd4bf':'#185FA5';
-    const r=document.createElement('div'); r.className='wk-row';
-    r.innerHTML=`<span class="wk-label" style="width:42px;font-size:9px;">${m.label}</span>
-      <div class="wk-bar-wrap">
-        <div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
-        <div style="position:absolute;left:${apct}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.4;"></div>
-      </div>
-      <span class="wk-val" style="width:52px;">${fmtK(m.v)}</span>`;
+  // Build 2026 array: hist + live Apr + nulls for rest
+  const won2026 = [...WON_MONTHS_2026_HIST, aprLiveWon, ...new Array(8).fill(null)];
+  const allVals = [...WON_MONTHS_2025, ...won2026.filter(v=>v!==null)];
+  const maxV = Math.max(...allVals, 1);
+  MONTH_NAMES.forEach((mon,i)=>{
+    const v25=WON_MONTHS_2025[i]||0;
+    const v26=won2026[i];
+    const has26=v26!=null;
+    const p25=(v25/maxV)*100;
+    const p26=has26?(v26/maxV)*100:0;
+    const yoy=v25>0&&has26?((v26-v25)/v25*100):null;
+    const yc=yoy>=0?'#4ade80':'#f87171';
+    const r=document.createElement('div');
+    r.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;';
+    r.innerHTML=`
+      <span style="width:28px;color:var(--text3);font-family:var(--font);font-size:10px;">${mon}</span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:28px;font-size:9px;color:var(--text3);text-align:right;">25</div>
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">
+            <div style="position:absolute;left:0;top:0;height:8px;width:${p25}%;background:#3d4260;border-radius:2px;"></div>
+          </div>
+          <span style="width:40px;text-align:right;font-family:var(--font);font-size:10px;color:var(--text2);">${fmtK(v25)}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div style="width:28px;font-size:9px;color:var(--text3);text-align:right;">26</div>
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">
+            ${has26?`<div style="position:absolute;left:0;top:0;height:8px;width:${p26}%;background:${i===3?'#2dd4bf':'#185FA5'};border-radius:2px;"></div>`:''}
+          </div>
+          <span style="width:40px;text-align:right;font-family:var(--font);font-size:10px;${has26?'color:var(--text)':'color:var(--text3)'};">${has26?fmtK(v26):'—'}</span>
+          ${yoy!==null?`<span style="width:36px;text-align:right;font-size:9px;color:${yc};">${yoy>=0?'+':''}${Math.round(yoy)}%</span>`:'<span style="width:36px;"></span>'}
+        </div>
+      </div>`;
     el.appendChild(r);
   });
 }
-buildWonMonthChart({});
+buildWonMonthChart(0);
 
 async function loadLive() {
   try {
@@ -364,7 +374,7 @@ async function loadLive() {
       if (yr===2026 && mo===3) {
         aprLive += adj;
         if (q.won) aprWon += adj; else { aprOpen++; aprOpenVal += adj; }
-      } else {
+      } else if (yr>2026 || (yr===2026 && mo>3)) {
         const key=`${yr}-${String(mo+1).padStart(2,'0')}`;
         byMonth[key]=(byMonth[key]||0)+adj;
       }
@@ -376,34 +386,6 @@ async function loadLive() {
     });
     buildChart(aprLive, extraMonths);
 
-    // Weekly won from 4/20+ using won_at
-    const wonByWeekMap={};
-    const liveStart=new Date(2026,3,20);
-    let cur=new Date(liveStart);
-    while(cur<=new Date()){
-      const k=`${cur.getMonth()+1}/${cur.getDate()}`;
-      wonByWeekMap[k]=0;
-      cur.setDate(cur.getDate()+7);
-    }
-    allLive.filter(q=>q.won && q.won_at).forEach(q=>{
-      const d=new Date(q.won_at);
-      if(d<liveStart)return;
-      const day=d.getDay(), diff=day===0?-6:1-day;
-      const mon=new Date(d); mon.setDate(d.getDate()+diff); mon.setHours(0,0,0,0);
-      const k=`${mon.getMonth()+1}/${mon.getDate()}`;
-      if(k in wonByWeekMap) wonByWeekMap[k]+=q.total_price||0;
-    });
-    buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
-
-    // Won by month tile
-    const wonMonthMap={};
-    allLive.filter(q=>q.won && q.won_at).forEach(q=>{
-      const d=new Date(q.won_at);
-      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      wonMonthMap[k]=(wonMonthMap[k]||0)+(q.total_price||0);
-    });
-    buildWonMonthChart(wonMonthMap);
-
     const aprTotal = aprLive;
     const pace = aprTotal / (today/DAYS_IN_APR);
     const pctVsLast = ((pace-940111)/940111*100);
@@ -412,6 +394,7 @@ async function loadLive() {
     document.getElementById('m1val').textContent = fmtK(aprTotal);
     document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live · day ${today}/30 · ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}% vs last Apr</span>`;
     document.getElementById('m2val').textContent = fmtK(aprWon);
+    buildWonMonthChart(aprWon);
     document.getElementById('m2sub').textContent = `${allLive.filter(q=>q.won).length} POs from quoting engine`;
     document.getElementById('m3val').textContent = aprOpen;
     document.getElementById('m3sub').textContent = `${fmtK(aprOpenVal)} open value`;
