@@ -587,7 +587,29 @@ table.bom select option{background:var(--surface2);}
 </div>
 
 <!-- DISPATCH MODAL — Log # capture -->
-<div class="modal-overlay" id="dispatch-modal">
+<div class="modal-overlay" id="dup-modal">
+  <div class="modal" style="max-height:none;width:420px;">
+    <div class="modal-header">
+      <span class="modal-title">⧉ Duplicate Quote</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeDupModal()">✕</button>
+    </div>
+    <div style="padding:18px 18px 10px;" class="cust-form">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Creates a new draft with all details copied. Change the customer name below.</div>
+      <div class="lfield">
+        <label>New Customer Name</label>
+        <input type="text" id="dup-customer" placeholder="Customer / Company"
+          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--sans);">
+      </div>
+      <div id="dup-err" style="color:var(--red);font-size:12px;min-height:16px;margin-top:2px;"></div>
+    </div>
+    <div style="padding:10px 18px 16px;display:flex;gap:8px;">
+      <button class="btn btn-accent" onclick="confirmDuplicate()" style="flex:1;font-size:14px;padding:11px;">⧉ Duplicate Quote</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeDupModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
   <div class="modal" style="max-height:none;width:420px;">
     <div class="modal-header">
       <span class="modal-title">🏭 Release to Floor</span>
@@ -1333,6 +1355,72 @@ async function newQuote(){
 }
 
 // ============================================================
+// DUPLICATE QUOTE
+// ============================================================
+function openDupModal(){
+  const q=quotes.find(x=>x.id===currentQuoteId);
+  if(!q){toast('No quote open','err');return;}
+  document.getElementById('dup-customer').value=q.customer_name||'';
+  document.getElementById('dup-err').textContent='';
+  document.getElementById('dup-modal').classList.add('open');
+  setTimeout(()=>{
+    const el=document.getElementById('dup-customer');
+    el.focus();el.select();
+  },80);
+}
+function closeDupModal(){
+  document.getElementById('dup-modal').classList.remove('open');
+}
+async function confirmDuplicate(){
+  const newCustomer=document.getElementById('dup-customer').value.trim();
+  const errEl=document.getElementById('dup-err');
+  if(!newCustomer){errEl.textContent='Customer name is required.';document.getElementById('dup-customer').focus();return;}
+  errEl.textContent='Duplicating…';
+
+  // Save current quote first so line_items are up to date
+  await saveQuote();
+
+  const q=quotes.find(x=>x.id===currentQuoteId);
+  if(!q){errEl.textContent='Could not find source quote.';return;}
+
+  // 1. Create new quote row copying all header fields, but new customer + draft status
+  const newQuoteRow={
+    user_id:         currentProfile.id,
+    status:          'draft',
+    customer_name:   newCustomer,
+    customer_quote_num: '',           // blank — new customer, new ref
+    location:        q.location||null,
+    lead_time_weeks: q.lead_time_weeks||null,
+    terms:           q.terms||null,
+    notes:           q.notes||null,
+  };
+  const{data:newQ,error:qErr}=await sbDB.from('quotes').insert(newQuoteRow).select().single();
+  if(qErr){errEl.textContent='Error creating quote: '+qErr.message;return;}
+
+  // 2. Fetch source line_items and re-insert under new quote_id
+  const{data:srcItems,error:liErr}=await sbDB.from('line_items')
+    .select('*').eq('quote_id',currentQuoteId).order('sort_order');
+  if(liErr){errEl.textContent='Error reading items: '+liErr.message;return;}
+
+  if(srcItems&&srcItems.length){
+    const newRows=srcItems.map(({id,quote_id,...rest})=>({...rest,quote_id:newQ.id}));
+    const{error:insErr}=await sbDB.from('line_items').insert(newRows);
+    if(insErr){errEl.textContent='Error copying items: '+insErr.message;return;}
+  }
+
+  // 3. Compute total from source and update the new quote row
+  const srcTotal=q.total_price||0;
+  await sbDB.from('quotes').update({total_price:srcTotal}).eq('id',newQ.id);
+
+  closeDupModal();
+  toast(`Duplicated → Q${newQ.number} for ${newCustomer} ✓`,'ok');
+
+  // 4. Load and open the new quote
+  await loadQuotes();
+  await openQuote(newQ.id);
+}
+
+// ============================================================
 // RENDER QUOTE EDITOR
 // ============================================================
 function renderQuoteEditor(q){
@@ -1356,14 +1444,15 @@ function renderQuoteEditor(q){
     banner=`<div class="review-banner approved">✓ Approved — ready to send</div>`;
   }
 
+  const dupBtn=`<button class="btn btn-ghost btn-sm no-print" onclick="openDupModal()" title="Duplicate this quote for another customer">⧉ Duplicate</button>`;
   let actions='';
   const previewBtn=`<button class="btn btn-ghost btn-sm no-print" onclick="showQuoteTab('preview')">Preview / PDF</button>`;
   if(isAdmin){
-    actions=`${previewBtn}${q.status!=='draft'?`<button class="btn btn-ghost btn-sm" onclick="openReviewPanel()">Review / Status</button>`:''}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button>`;
+    actions=`${previewBtn}${q.status!=='draft'?`<button class="btn btn-ghost btn-sm" onclick="openReviewPanel()">Review / Status</button>`:''}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button>${dupBtn}`;
   } else if(isOwner&&(q.status==='draft'||q.status==='rejected')){
-    actions=`${previewBtn}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button><button class="btn btn-accent btn-sm" onclick="submitForReview()">Submit for Review →</button>`;
+    actions=`${previewBtn}<button class="btn btn-danger btn-sm" onclick="deleteQuote()">Delete</button><button class="btn btn-accent btn-sm" onclick="submitForReview()">Submit for Review →</button>${dupBtn}`;
   } else {
-    actions=`${previewBtn}`;
+    actions=`${previewBtn}${dupBtn}`;
   }
 
   document.getElementById('main-content').innerHTML=`
@@ -3551,6 +3640,8 @@ function formatDueDate(dateStr) {
 document.getElementById('odoo-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeOdooModal(); });
 document.getElementById('cust-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeCustModal(); });
 document.getElementById('won-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeWonModal(); });
+document.getElementById('dup-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDupModal(); });
+document.getElementById('dup-customer').addEventListener('keydown', e => { if(e.key==='Enter') confirmDuplicate(); });
 document.getElementById('dispatch-modal').addEventListener('click', e => { if(e.target===e.currentTarget) closeDispatchModal(); });
 document.getElementById('dispatch-modal-log').addEventListener('keydown', e => { if(e.key==='Enter') confirmDispatchModal(); });
 document.getElementById('won-po').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('won-due').focus(); });
