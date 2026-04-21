@@ -292,14 +292,14 @@ function buildWeeklyChart(weeks) {
   const gl=52000;
   weeks.forEach(w=>{
     const pct=(w.v/maxV)*100, gpct=Math.min(100,(gl/maxV)*100);
-    const c=w.v>=gl?'#4ade80':'#185FA5';
+    const c=w.live ? '#2dd4bf' : (w.v>=gl?'#4ade80':'#185FA5');
     const r=document.createElement('div'); r.className='wk-row';
     r.innerHTML=`<span class="wk-label">${w.label}</span>
       <div class="wk-bar-wrap">
         <div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
         <div style="position:absolute;left:${gpct}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.5;"></div>
       </div>
-      <span class="wk-val">${fmtK(w.v)}</span>`;
+      <span class="wk-val" style="${w.live?'color:#2dd4bf;':''}">${fmtK(w.v)}</span>`;
     wDiv.appendChild(r);
   });
 }
@@ -366,6 +366,15 @@ async function loadLive() {
 
     let aprLive=0, aprWon=0, aprOpen=0, aprOpenVal=0;
     const byMonth={};
+    const byWonWeek={}; // key: "YYYY-MM-DD" of week-start (Sunday)
+
+    // Helper: get Sunday of the week containing a date
+    function weekStart(d) {
+      const dt = new Date(d);
+      dt.setHours(0,0,0,0);
+      dt.setDate(dt.getDate() - dt.getDay()); // back to Sunday
+      return dt.toISOString().slice(0,10);
+    }
 
     allLive.forEach(q => {
       const d = new Date(q.created_at);
@@ -378,7 +387,25 @@ async function loadLive() {
         const key=`${yr}-${String(mo+1).padStart(2,'0')}`;
         byMonth[key]=(byMonth[key]||0)+adj;
       }
+      // Weekly won — bucket by won_at date into week-starting-Sunday
+      if (q.won && q.won_at) {
+        const wk = weekStart(new Date(q.won_at));
+        byWonWeek[wk] = (byWonWeek[wk]||0) + adj;
+      }
     });
+
+    // Build live weekly rows and append to historical chart
+    // Last hist week ends 4/13; live starts 4/20
+    const HIST_CUTOFF = '2026-04-14'; // anything with won_at >= this goes live
+    const liveWeeks = Object.entries(byWonWeek)
+      .filter(([wk]) => wk >= HIST_CUTOFF)
+      .sort(([a],[b]) => a.localeCompare(b))
+      .map(([wk, v]) => {
+        const d = new Date(wk + 'T12:00:00');
+        const label = `${d.getMonth()+1}/${d.getDate()}`;
+        return { label, v, live: true };
+      });
+    buildWeeklyChart([...WKS_HIST, ...liveWeeks]);
 
     const extraMonths = Object.entries(byMonth).sort().map(([k,v])=>{
       const [yr,mo]=k.split('-');
@@ -389,7 +416,6 @@ async function loadLive() {
     const aprTotal = aprLive;
     const pace = aprTotal / (today/DAYS_IN_APR);
     const pctVsLast = ((pace-940111)/940111*100);
-    const barPct = Math.min(100,(aprTotal/940111)*100);
 
     document.getElementById('m1val').textContent = fmtK(aprTotal);
     document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live · day ${today}/30 · ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}% vs last Apr</span>`;
