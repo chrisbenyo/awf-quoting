@@ -3126,10 +3126,11 @@ async function loadShopScreen() {
 async function loadFloorBoard() {
   // Shows one card per dispatched DETAIL (shop_job), not per cut piece
   // PURCHASED removed; CLEAN + PRIME merged into CLEAN_PRIME
-  const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','BLAST','SHIP'];
-  const STAGE_LABELS = {SAW:'Sawing',BURN:'Burn / Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning / Priming',BLAST:'Sand Blast',SHIP:'Ship'};
+  const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','SHIP'];
+  const STAGE_LABELS = {SAW:'Sawing',BURN:'Burn / Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning / Priming',SHIP:'Ready to Ship'};
   function normalizeStage(s) {
     if (!s || s === 'PURCHASED' || s === 'DISPATCHED') return 'SAW';
+    if (s === 'BLAST' || s === 'SANDBLAST') return 'SHIP';
     if (s === 'PRIME' || s === 'CLEAN') return 'CLEAN_PRIME';
     return s;
   }
@@ -3185,9 +3186,9 @@ async function loadFloorBoard() {
 
   const byStage = {};
   STAGES.forEach(s => byStage[s] = []);
-  enrichedItems.forEach(item => {
-    const job = jobs.find(j=>j.id===item.shop_job_id);
-    if (job && byStage[item.current_stage]) byStage[item.current_stage].push({item,job,customer:custMap[job.quote_id]||'—'});
+  enrichedJobs.forEach(job => {
+    const s = STAGES.includes(job.current_stage) ? job.current_stage : 'SAW';
+    byStage[s].push(job);
   });
 
   function dueClass(d) {
