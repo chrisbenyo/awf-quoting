@@ -325,6 +325,31 @@ table.bom select option{background:var(--surface2);}
 .stage-PRIME{background:#2a2a1a;color:#d4d42d;border-color:#5a5a1a;}
 .stage-BLAST{background:#2a1a2a;color:#d42dd4;border-color:#5a1a5a;}
 .stage-SHIP{background:var(--green-dim);color:var(--green);border-color:#1a6030;}
+
+/* ── FLOOR BOARD KANBAN ── */
+.floor-stat-row{display:flex;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
+.floor-stat{display:flex;flex-direction:column;align-items:center;min-width:80px;}
+.floor-stat-num{font-family:var(--font);font-size:22px;font-weight:500;color:var(--teal);}
+.floor-stat-num.amber{color:var(--amber);}
+.floor-stat-num.warn{color:var(--warn);}
+.floor-stat-num.red{color:var(--red);}
+.floor-stat-label{font-family:var(--font);font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-top:2px;}
+.floor-kanban{display:flex;gap:0;overflow-x:auto;min-height:400px;}
+.kol{min-width:180px;flex:1;border-right:1px solid var(--border);display:flex;flex-direction:column;}
+.kol:last-child{border-right:none;}
+.kol-hdr{padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.kol-name{font-family:var(--font);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);}
+.kol-cnt{font-family:var(--font);font-size:12px;color:var(--text3);background:var(--bg);border-radius:10px;padding:1px 7px;}
+.kol-body{flex:1;overflow-y:auto;padding:8px;}
+.kol-empty{color:var(--text3);font-size:12px;padding:12px 4px;text-align:center;}
+.kol-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:border-color .12s;}
+.kol-card:hover{border-color:var(--border2);}
+.kol-card-po{font-family:var(--font);font-size:11px;color:var(--amber);font-weight:500;}
+.kol-card-name{font-size:13px;font-weight:500;margin:2px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kol-card-meta{font-size:11px;color:var(--text2);}
+.kol-card-due{font-family:var(--font);font-size:10px;display:inline-block;margin-top:4px;padding:1px 6px;border-radius:3px;border:1px solid var(--border);}
+.kol-card-due.overdue{border-color:var(--red);color:var(--red);}
+.kol-card-due.soon{border-color:var(--warn);color:var(--warn);}
 </style>
 </head>
 <body>
@@ -434,6 +459,7 @@ table.bom select option{background:var(--surface2);}
   <div class="shop-tabs">
     <button class="shop-tab active" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
     <button class="shop-tab" id="stab-active" onclick="switchShopTab('active',this)">Active Jobs</button>
+    <button class="shop-tab" id="stab-floor" onclick="switchShopTab('floor',this)">&#128450; Floor Board</button>
   </div>
   <div class="shop-body">
     <div id="shop-pending-panel">
@@ -447,6 +473,10 @@ table.bom select option{background:var(--surface2);}
         <input id="active-search" class="sidebar-search" placeholder="🔍  Search PO, customer, detail, log #…" oninput="filterActiveList()" style="max-width:380px;margin-bottom:0;">
       </div>
       <div id="shop-active-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
+    </div>
+    <div id="shop-floor-panel" style="display:none;flex-direction:column;">
+      <div id="floor-stat-row" class="floor-stat-row"></div>
+      <div id="floor-kanban" class="floor-kanban"></div>
     </div>
   </div>
 </div>
@@ -3069,11 +3099,100 @@ function switchShopTab(tab, el) {
   document.getElementById('shop-active-panel').style.display  = tab === 'active'  ? 'block' : 'none';
   if (tab === 'active') loadActiveJobs();
   if (tab === 'pending') loadPendingDispatch();
+  if (tab === 'floor') loadFloorBoard();
+  const fp = document.getElementById('shop-floor-panel');
+  if (fp) fp.style.display = tab === 'floor' ? 'flex' : 'none';
 }
 
 async function loadShopScreen() {
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
+
+async function loadFloorBoard() {
+  const statRow = document.getElementById('floor-stat-row');
+  const kanban  = document.getElementById('floor-kanban');
+  if (statRow) statRow.innerHTML = '<div class="floor-stat"><div class="floor-stat-num amber">—</div><div class="floor-stat-label">LOADING</div></div>';
+  if (kanban)  kanban.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading floor data…</div>';
+  try {
+    // Fetch dispatched jobs
+    const { data: jobs, error: jobErr } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
+    if (jobErr) throw jobErr;
+    if (!jobs || !jobs.length) {
+      if (statRow) statRow.innerHTML = '';
+      if (kanban)  kanban.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor.</div>';
+      return;
+    }
+    // Get customer names from quotes
+    const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
+    const custMap = {};
+    for (const qid of quoteIds) {
+      const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
+      if (q) custMap[qid] = q.customer_name || '—';
+    }
+    // Get latest stage per job from events
+    const {data:evts} = await sbDB.from('shop_events').select('shop_job_id,station,created_at').order('created_at',{ascending:false});
+    const stageMap = {};
+    for (const ev of (evts||[])) {
+      if (ev.shop_job_id && !stageMap[ev.shop_job_id]) {
+        let s = ev.station || 'SAW';
+        if (!s||s==='PURCHASED'||s==='DISPATCHED') s='SAW';
+        else if (s==='PRIME'||s==='CLEAN') s='CLEAN_PRIME';
+        else if (s==='BLAST'||s==='SANDBLAST') s='SHIP';
+        stageMap[ev.shop_job_id] = s;
+      }
+    }
+    const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','SHIP'];
+    const LABELS = {SAW:'Sawing',BURN:'Burn/Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning/Priming',SHIP:'Ready to Ship'};
+    const now = new Date();
+    const enriched = jobs.map(j => ({
+      ...j,
+      customer: custMap[j.quote_id]||'—',
+      stage: stageMap[j.id]||'SAW'
+    }));
+    const active  = enriched.filter(j => j.stage !== 'SHIP');
+    const cnt     = k => active.filter(j=>j.stage===k).length;
+    const overdue = active.filter(j=>j.due_date&&(new Date(j.due_date)-now)<0).length;
+    const soon    = active.filter(j=>{const d=new Date(j.due_date)-now;return j.due_date&&d>=0&&d<3*86400000;}).length;
+    if (statRow) statRow.innerHTML = `
+      <div class="floor-stat"><div class="floor-stat-num amber">${active.length}</div><div class="floor-stat-label">ACTIVE JOBS</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('SAW')}</div><div class="floor-stat-label">SAWING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('BURN')}</div><div class="floor-stat-label">BURN/CUT</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('FIT')}</div><div class="floor-stat-label">FITTING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('WELD')}</div><div class="floor-stat-label">WELDING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num warn">${soon}</div><div class="floor-stat-label">DUE SOON</div></div>
+      <div class="floor-stat"><div class="floor-stat-num${overdue>0?' red':''}">${overdue}</div><div class="floor-stat-label">OVERDUE</div></div>`;
+    // Build kanban columns
+    const byStage = {};
+    STAGES.forEach(s => byStage[s] = []);
+    enriched.forEach(j => { const s = STAGES.includes(j.stage)?j.stage:'SAW'; byStage[s].push(j); });
+    function dueCls(d) {
+      if (!d) return '';
+      const diff = (new Date(d)-now)/86400000;
+      return diff<0?'overdue':diff<3?'soon':'';
+    }
+    function fmtDue(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    }
+    if (kanban) kanban.innerHTML = STAGES.map(stage => {
+      const here = byStage[stage];
+      const cards = here.length
+        ? here.map(j => `<div class="kol-card" onclick="switchShopTab('active',document.getElementById('stab-active'))">
+            <div class="kol-card-po">${esc(j.po_number||'—')}</div>
+            <div class="kol-card-name">${esc(j.detail_name||('Det '+j.detail_number))}</div>
+            <div class="kol-card-meta">${esc(j.customer)} · qty ${j.quantity||1}</div>
+            <span class="kol-card-due ${dueCls(j.due_date)}">Due ${fmtDue(j.due_date)}</span>
+          </div>`).join('')
+        : '<div class="kol-empty">—</div>';
+      return `<div class="kol ${stage}"><div class="kol-hdr"><span class="kol-name">${LABELS[stage]}</span><span class="kol-cnt">${here.length}</span></div><div class="kol-body">${cards}</div></div>`;
+    }).join('');
+  } catch(err) {
+    const kanban = document.getElementById('floor-kanban');
+    if (kanban) kanban.innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0;">Error loading floor data.</div>';
+    console.error('loadFloorBoard error:', err);
+  }
+}
+
 
 async function loadPendingDispatch() {
   const panel = document.getElementById('shop-pending-list');
