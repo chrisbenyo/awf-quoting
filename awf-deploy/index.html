@@ -3290,13 +3290,6 @@ async function loadFloorBoard() {
     const s = STAGES.includes(job.current_stage) ? job.current_stage : 'SAW';
     byStage[s].push(job);
   });
-    }).join('') : `<div class="kol-empty">—</div>`;
-
-    return `<div class="kol ${stage}">
-      <div class="kol-hdr"><span class="kol-name">${STAGE_LABELS[stage]}</span><span class="kol-cnt">${jobsHere.length}</span></div>
-      <div class="kol-body">${cards}</div>
-    </div>`;
-  }).join('');
 
 async function loadPendingDispatch() {
   const panel = document.getElementById('shop-pending-list');
