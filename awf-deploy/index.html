@@ -3149,44 +3149,48 @@ async function loadFloorBoard() {
     if (q) custMap[qid] = q.customer_name || '—';
   }
 
-  const jobIds = jobs.map(j=>j.id);
-  let allItems = [];
-  for (const jid of jobIds) {
-    const {data:items} = await sbDB.from('shop_job_items').select('*').eq('shop_job_id',jid);
-    if (items) allItems = allItems.concat(items);
-  }
-
-  const {data:events} = await sbDB.from('shop_events').select('shop_job_item_id,station,event_type,created_at').order('created_at',{ascending:false});
-  const itemStageMap = {};
+  // Latest stage per JOB from events (not per item)
+  const {data:events} = await sbDB.from('shop_events')
+    .select('shop_job_id,station,created_at')
+    .order('created_at',{ascending:false});
+  const jobStageMap = {};
   for (const ev of (events||[])) {
-    if (ev.shop_job_item_id && !itemStageMap[ev.shop_job_item_id]) {
-      itemStageMap[ev.shop_job_item_id] = ev.station;
+    if (ev.shop_job_id && !jobStageMap[ev.shop_job_id]) {
+      jobStageMap[ev.shop_job_id] = normalizeStage(ev.station);
     }
   }
 
-  const enrichedItems = allItems.map(item => ({
-    ...item,
-    current_stage: itemStageMap[item.id] || item.station_assignment || 'SAW'
+  const now = new Date();
+  const allEnriched = jobs.map(job => ({
+    ...job,
+    customer: custMap[job.quote_id] || '—',
+    current_stage: normalizeStage(jobStageMap[job.id] || 'SAW')
   }));
 
-  const now = new Date();
-  const totalJobs = jobs.length;
-  const totalItems = enrichedItems.length;
-  const atWeld = enrichedItems.filter(i=>i.current_stage==='WELD').length;
-  const overdue = jobs.filter(j => j.due_date && (new Date(j.due_date)-now)/86400000 < 0).length;
-  const soon    = jobs.filter(j => j.due_date && (new Date(j.due_date)-now)/86400000 >= 0 && (new Date(j.due_date)-now)/86400000 < 3).length;
+  // Active jobs = not shipped yet
+  const activeJobs = allEnriched.filter(j => j.current_stage !== 'SHIP');
+
+  const totalJobs = activeJobs.length;
+  const atBurn    = activeJobs.filter(j=>j.current_stage==='BURN').length;
+  const atFit     = activeJobs.filter(j=>j.current_stage==='FIT').length;
+  const atWeld    = activeJobs.filter(j=>j.current_stage==='WELD').length;
+  const atClean   = activeJobs.filter(j=>j.current_stage==='CLEAN_PRIME').length;
+  const overdue   = activeJobs.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000<0).length;
+  const soon      = activeJobs.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000>=0&&(new Date(j.due_date)-now)/86400000<3).length;
 
   document.getElementById('floor-stat-row').innerHTML = `
     <div class="floor-stat"><div class="floor-stat-num amber">${totalJobs}</div><div class="floor-stat-label">ACTIVE JOBS</div></div>
-    <div class="floor-stat"><div class="floor-stat-num teal">${totalItems}</div><div class="floor-stat-label">ITEMS ON FLOOR</div></div>
-    <div class="floor-stat"><div class="floor-stat-num">${atWeld}</div><div class="floor-stat-label">AT WELDING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atBurn}</div><div class="floor-stat-label">BURN / CUT</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atFit}</div><div class="floor-stat-label">FITTING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atWeld}</div><div class="floor-stat-label">WELDING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atClean}</div><div class="floor-stat-label">CLEANING</div></div>
     <div class="floor-stat"><div class="floor-stat-num warn">${soon}</div><div class="floor-stat-label">DUE SOON</div></div>
     <div class="floor-stat"><div class="floor-stat-num${overdue>0?' red':''}">${overdue}</div><div class="floor-stat-label">OVERDUE</div></div>
   `;
 
   const byStage = {};
   STAGES.forEach(s => byStage[s] = []);
-  enrichedJobs.forEach(job => {
+  allEnriched.forEach(job => {
     const s = STAGES.includes(job.current_stage) ? job.current_stage : 'SAW';
     byStage[s].push(job);
   });
@@ -3202,14 +3206,51 @@ async function loadFloorBoard() {
 
   document.getElementById('floor-kanban').innerHTML = STAGES.map(stage => {
     const jobsHere = byStage[stage];
-    const cards = jobsHere.length ? jobsHere.map(job => {
-      const dc = dueClass(job.due_date);
-      return `<div class="kol-card" onclick="switchShopTab('active',document.getElementById('stab-active'))">
-        <div class="kol-card-po">${esc(job.po_number||'—')}</div>
-        <div class="kol-card-name">${esc(job.detail_name||('Detail '+job.detail_number))}</div>
-        <div class="kol-card-meta">${esc(job.customer)} · qty ${job.quantity||1}</div>
-        <span class="kol-card-due ${dc}">Due ${fmtD(job.due_date)}</span>
-      </div>`;
+  // Latest stage per JOB from events (not per item)
+  const {data:events} = await sbDB.from('shop_events')
+    .select('shop_job_id,station,created_at')
+    .order('created_at',{ascending:false});
+  const jobStageMap = {};
+  for (const ev of (events||[])) {
+    if (ev.shop_job_id && !jobStageMap[ev.shop_job_id]) {
+      jobStageMap[ev.shop_job_id] = normalizeStage(ev.station);
+    }
+  }
+
+  const now = new Date();
+  const allEnriched = jobs.map(job => ({
+    ...job,
+    customer: custMap[job.quote_id] || '—',
+    current_stage: normalizeStage(jobStageMap[job.id] || 'SAW')
+  }));
+
+  // Active jobs = not shipped yet
+  const activeJobs = allEnriched.filter(j => j.current_stage !== 'SHIP');
+
+  const totalJobs = activeJobs.length;
+  const atBurn    = activeJobs.filter(j=>j.current_stage==='BURN').length;
+  const atFit     = activeJobs.filter(j=>j.current_stage==='FIT').length;
+  const atWeld    = activeJobs.filter(j=>j.current_stage==='WELD').length;
+  const atClean   = activeJobs.filter(j=>j.current_stage==='CLEAN_PRIME').length;
+  const overdue   = activeJobs.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000<0).length;
+  const soon      = activeJobs.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000>=0&&(new Date(j.due_date)-now)/86400000<3).length;
+
+  document.getElementById('floor-stat-row').innerHTML = `
+    <div class="floor-stat"><div class="floor-stat-num amber">${totalJobs}</div><div class="floor-stat-label">ACTIVE JOBS</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atBurn}</div><div class="floor-stat-label">BURN / CUT</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atFit}</div><div class="floor-stat-label">FITTING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atWeld}</div><div class="floor-stat-label">WELDING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atClean}</div><div class="floor-stat-label">CLEANING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num warn">${soon}</div><div class="floor-stat-label">DUE SOON</div></div>
+    <div class="floor-stat"><div class="floor-stat-num${overdue>0?' red':''}">${overdue}</div><div class="floor-stat-label">OVERDUE</div></div>
+  `;
+
+  const byStage = {};
+  STAGES.forEach(s => byStage[s] = []);
+  allEnriched.forEach(job => {
+    const s = STAGES.includes(job.current_stage) ? job.current_stage : 'SAW';
+    byStage[s].push(job);
+  });
     }).join('') : `<div class="kol-empty">—</div>`;
 
     return `<div class="kol ${stage}">
