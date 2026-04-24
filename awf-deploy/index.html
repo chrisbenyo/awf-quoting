@@ -333,7 +333,7 @@ table.bom select option{background:var(--surface2);}
 .floor-stat-label{font-size:11px;color:var(--text3);font-family:var(--font);margin-top:3px;letter-spacing:.04em;}
 .kanban-board{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;}
 .kanban-board::-webkit-scrollbar{height:4px;}
-.kol{min-width:195px;flex:0 0 195px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.kol{min-width:175px;flex:0 0 175px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .kol-hdr{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .kol-name{font-family:var(--font);font-size:11px;font-weight:500;letter-spacing:.04em;}
 .kol-cnt{font-family:var(--font);font-size:10px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;}
@@ -356,6 +356,7 @@ table.bom select option{background:var(--surface2);}
 .kol.PRIME{border-top:2px solid #5a5a1a;} .kol.PRIME .kol-name{color:#d4d42d;}
 .kol.BLAST{border-top:2px solid #5a1a5a;} .kol.BLAST .kol-name{color:#d42dd4;}
 .kol.SHIP{border-top:2px solid #1a6030;} .kol.SHIP .kol-name{color:var(--green);}
+.kol.CLEAN_PRIME{border-top:2px solid #1a5a5a;} .kol.CLEAN_PRIME .kol-name{color:var(--teal);}
 .stage-pip-row{display:flex;gap:2px;margin-top:7px;}
 .stage-pip{height:3px;flex:1;border-radius:2px;background:var(--border);}
 .stage-pip.done{background:var(--teal);} .stage-pip.active{background:var(--amber);}
@@ -3123,8 +3124,15 @@ async function loadShopScreen() {
 }
 
 async function loadFloorBoard() {
-  const STAGES = ['SAW','BURN','PURCHASED','FIT','WELD','CLEAN','PRIME','BLAST','SHIP'];
-  const STAGE_LABELS = {SAW:'Sawing',BURN:'Burn / Cut',PURCHASED:'Purchased',FIT:'Fitting',WELD:'Welding',CLEAN:'Cleaning',PRIME:'Priming',BLAST:'Sand Blast',SHIP:'Ship'};
+  // Shows one card per dispatched DETAIL (shop_job), not per cut piece
+  // PURCHASED removed; CLEAN + PRIME merged into CLEAN_PRIME
+  const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','BLAST','SHIP'];
+  const STAGE_LABELS = {SAW:'Sawing',BURN:'Burn / Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning / Priming',BLAST:'Sand Blast',SHIP:'Ship'};
+  function normalizeStage(s) {
+    if (!s || s === 'PURCHASED' || s === 'DISPATCHED') return 'SAW';
+    if (s === 'PRIME' || s === 'CLEAN') return 'CLEAN_PRIME';
+    return s;
+  }
 
   const { data: jobs } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
   if (!jobs || !jobs.length) {
