@@ -470,17 +470,17 @@ table.bom select option{background:var(--surface2);}
     <button class="btn btn-ghost btn-sm" onclick="loadShopScreen()" style="margin-left:auto;">⟳ Refresh</button>
   </div>
   <div class="shop-tabs">
-    <button class="shop-tab active" id="stab-board" onclick="switchShopTab('board',this)">Floor Board</button>
-    <button class="shop-tab" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
+    <button class="shop-tab active" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
     <button class="shop-tab" id="stab-active" onclick="switchShopTab('active',this)">Active Jobs</button>
+    <button class="shop-tab" id="stab-board" onclick="switchShopTab('board',this)">Floor Board</button>
   </div>
   <div class="shop-body">
-    <div id="shop-board-panel">
+    <div id="shop-board-panel" style="display:none;">
       <div class="floor-stats" id="floor-stat-row"></div>
       <div class="shop-section-label">Jobs by Station</div>
       <div class="kanban-board" id="floor-kanban"></div>
     </div>
-    <div id="shop-pending-panel" style="display:none;">
+    <div id="shop-pending-panel">
       <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="pending-search" class="sidebar-search" placeholder="🔍  Search PO, customer…" oninput="filterPendingList()" style="max-width:320px;margin-bottom:0;">
       </div>
@@ -3099,8 +3099,8 @@ let shopCurrentTab  = 'pending';
 function openShopScreen() {
   document.getElementById('shop-screen').classList.add('open');
   document.getElementById('app').style.display = 'none';
-  // Default to Floor Board tab
-  switchShopTab('board', document.getElementById('stab-board'));
+  // Default to Ready to Dispatch tab
+  switchShopTab('pending', document.getElementById('stab-pending'));
   loadShopScreen();
 }
 function closeShopScreen() {
@@ -3201,19 +3201,19 @@ async function loadFloorBoard() {
   function fmtD(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 
   document.getElementById('floor-kanban').innerHTML = STAGES.map(stage => {
-    const entries = byStage[stage];
-    const cards = entries.length ? entries.map(({item,job,customer}) => {
+    const jobsHere = byStage[stage];
+    const cards = jobsHere.length ? jobsHere.map(job => {
       const dc = dueClass(job.due_date);
-      return `<div class="kol-card" onclick="openShopScreen();document.getElementById('stab-active').click();">
+      return `<div class="kol-card" onclick="switchShopTab('active',document.getElementById('stab-active'))">
         <div class="kol-card-po">${esc(job.po_number||'—')}</div>
-        <div class="kol-card-name">${esc(item.description||'—')}</div>
-        <div class="kol-card-meta">${esc(customer)} · qty ${item.quantity||1}</div>
+        <div class="kol-card-name">${esc(job.detail_name||('Detail '+job.detail_number))}</div>
+        <div class="kol-card-meta">${esc(job.customer)} · qty ${job.quantity||1}</div>
         <span class="kol-card-due ${dc}">Due ${fmtD(job.due_date)}</span>
       </div>`;
     }).join('') : `<div class="kol-empty">—</div>`;
 
     return `<div class="kol ${stage}">
-      <div class="kol-hdr"><span class="kol-name">${STAGE_LABELS[stage]}</span><span class="kol-cnt">${entries.length}</span></div>
+      <div class="kol-hdr"><span class="kol-name">${STAGE_LABELS[stage]}</span><span class="kol-cnt">${jobsHere.length}</span></div>
       <div class="kol-body">${cards}</div>
     </div>`;
   }).join('');
