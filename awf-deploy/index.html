@@ -325,6 +325,42 @@ table.bom select option{background:var(--surface2);}
 .stage-PRIME{background:#2a2a1a;color:#d4d42d;border-color:#5a5a1a;}
 .stage-BLAST{background:#2a1a2a;color:#d42dd4;border-color:#5a1a5a;}
 .stage-SHIP{background:var(--green-dim);color:var(--green);border-color:#1a6030;}
+/* ── FLOOR BOARD (Kanban) ── */
+.floor-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
+.floor-stat{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;}
+.floor-stat-num{font-family:var(--font);font-size:22px;font-weight:500;color:var(--text);}
+.floor-stat-num.amber{color:var(--amber);} .floor-stat-num.teal{color:var(--teal);} .floor-stat-num.red{color:var(--red);} .floor-stat-num.warn{color:var(--warn);}
+.floor-stat-label{font-size:11px;color:var(--text3);font-family:var(--font);margin-top:3px;letter-spacing:.04em;}
+.kanban-board{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;}
+.kanban-board::-webkit-scrollbar{height:4px;}
+.kol{min-width:195px;flex:0 0 195px;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.kol-hdr{padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.kol-name{font-family:var(--font);font-size:11px;font-weight:500;letter-spacing:.04em;}
+.kol-cnt{font-family:var(--font);font-size:10px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:1px 6px;}
+.kol-body{padding:8px;display:flex;flex-direction:column;gap:5px;min-height:100px;}
+.kol-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:9px 11px;cursor:pointer;transition:border-color .12s;}
+.kol-card:hover{border-color:var(--border2);}
+.kol-card-po{font-family:var(--font);font-size:10px;color:var(--amber);font-weight:500;}
+.kol-card-name{font-size:12px;font-weight:500;margin:2px 0 4px;line-height:1.35;word-break:break-word;}
+.kol-card-meta{font-size:11px;color:var(--text3);}
+.kol-card-due{font-family:var(--font);font-size:10px;margin-top:5px;padding:1px 5px;border-radius:3px;border:1px solid var(--border2);color:var(--text2);display:inline-block;}
+.kol-card-due.overdue{border-color:var(--red);color:var(--red);}
+.kol-card-due.soon{border-color:var(--warn);color:var(--warn);}
+.kol-empty{font-size:11px;color:var(--text3);text-align:center;padding:18px 0;font-family:var(--font);}
+.kol.SAW{border-top:2px solid #2a5a2a;} .kol.SAW .kol-name{color:#6ee66e;}
+.kol.BURN{border-top:2px solid #5a3a0a;} .kol.BURN .kol-name{color:var(--amber);}
+.kol.PURCHASED{border-top:2px solid #1e3a5f;} .kol.PURCHASED .kol-name{color:var(--blue);}
+.kol.FIT{border-top:2px solid #3a2a6a;} .kol.FIT .kol-name{color:#a78bfa;}
+.kol.WELD{border-top:2px solid #6a2a2a;} .kol.WELD .kol-name{color:var(--red);}
+.kol.CLEAN{border-top:2px solid #1a5a5a;} .kol.CLEAN .kol-name{color:var(--teal);}
+.kol.PRIME{border-top:2px solid #5a5a1a;} .kol.PRIME .kol-name{color:#d4d42d;}
+.kol.BLAST{border-top:2px solid #5a1a5a;} .kol.BLAST .kol-name{color:#d42dd4;}
+.kol.SHIP{border-top:2px solid #1a6030;} .kol.SHIP .kol-name{color:var(--green);}
+.stage-pip-row{display:flex;gap:2px;margin-top:7px;}
+.stage-pip{height:3px;flex:1;border-radius:2px;background:var(--border);}
+.stage-pip.done{background:var(--teal);} .stage-pip.active{background:var(--amber);}
+.live-dot{width:7px;height:7px;background:var(--green);border-radius:50%;display:inline-block;animation:livepulse 2s infinite;}
+@keyframes livepulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(74,222,128,.4)}50%{opacity:.8;box-shadow:0 0 0 5px rgba(74,222,128,0)}}
 </style>
 </head>
 <body>
@@ -427,16 +463,23 @@ table.bom select option{background:var(--surface2);}
 <!-- SHOP DISPATCH SCREEN -->
 <div id="shop-screen">
   <div class="shop-header">
-    <h2>🏭 Shop Floor Dispatch</h2>
+    <h2>🏭 Shop Floor</h2>
+    <div style="display:flex;align-items:center;gap:5px;"><div class="live-dot"></div><span style="font-family:var(--font);font-size:10px;color:var(--green);">LIVE</span></div>
     <button class="btn btn-ghost btn-sm" onclick="closeShopScreen()">← Back to Quotes</button>
     <button class="btn btn-ghost btn-sm" onclick="loadShopScreen()" style="margin-left:auto;">⟳ Refresh</button>
   </div>
   <div class="shop-tabs">
-    <button class="shop-tab active" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
+    <button class="shop-tab active" id="stab-board" onclick="switchShopTab('board',this)">Floor Board</button>
+    <button class="shop-tab" id="stab-pending" onclick="switchShopTab('pending',this)">Ready to Dispatch</button>
     <button class="shop-tab" id="stab-active" onclick="switchShopTab('active',this)">Active Jobs</button>
   </div>
   <div class="shop-body">
-    <div id="shop-pending-panel">
+    <div id="shop-board-panel">
+      <div class="floor-stats" id="floor-stat-row"></div>
+      <div class="shop-section-label">Jobs by Station</div>
+      <div class="kanban-board" id="floor-kanban"></div>
+    </div>
+    <div id="shop-pending-panel" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="pending-search" class="sidebar-search" placeholder="🔍  Search PO, customer…" oninput="filterPendingList()" style="max-width:320px;margin-bottom:0;">
       </div>
@@ -3055,6 +3098,8 @@ let shopCurrentTab  = 'pending';
 function openShopScreen() {
   document.getElementById('shop-screen').classList.add('open');
   document.getElementById('app').style.display = 'none';
+  // Default to Floor Board tab
+  switchShopTab('board', document.getElementById('stab-board'));
   loadShopScreen();
 }
 function closeShopScreen() {
@@ -3065,14 +3110,104 @@ function switchShopTab(tab, el) {
   shopCurrentTab = tab;
   document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
+  document.getElementById('shop-board-panel').style.display   = tab === 'board'   ? 'block' : 'none';
   document.getElementById('shop-pending-panel').style.display = tab === 'pending' ? 'block' : 'none';
   document.getElementById('shop-active-panel').style.display  = tab === 'active'  ? 'block' : 'none';
-  if (tab === 'active') loadActiveJobs();
+  if (tab === 'active')  loadActiveJobs();
   if (tab === 'pending') loadPendingDispatch();
+  if (tab === 'board')   loadFloorBoard();
 }
 
 async function loadShopScreen() {
-  await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
+  await Promise.all([loadFloorBoard(), loadPendingDispatch(), loadActiveJobs()]);
+}
+
+async function loadFloorBoard() {
+  const STAGES = ['SAW','BURN','PURCHASED','FIT','WELD','CLEAN','PRIME','BLAST','SHIP'];
+  const STAGE_LABELS = {SAW:'Sawing',BURN:'Burn / Cut',PURCHASED:'Purchased',FIT:'Fitting',WELD:'Welding',CLEAN:'Cleaning',PRIME:'Priming',BLAST:'Sand Blast',SHIP:'Ship'};
+
+  const { data: jobs } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
+  if (!jobs || !jobs.length) {
+    document.getElementById('floor-stat-row').innerHTML = '';
+    document.getElementById('floor-kanban').innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor.</div>';
+    return;
+  }
+
+  const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
+  const custMap = {};
+  for (const qid of quoteIds) {
+    const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
+    if (q) custMap[qid] = q.customer_name || '—';
+  }
+
+  const jobIds = jobs.map(j=>j.id);
+  let allItems = [];
+  for (const jid of jobIds) {
+    const {data:items} = await sbDB.from('shop_job_items').select('*').eq('shop_job_id',jid);
+    if (items) allItems = allItems.concat(items);
+  }
+
+  const {data:events} = await sbDB.from('shop_events').select('shop_job_item_id,station,event_type,created_at').order('created_at',{ascending:false});
+  const itemStageMap = {};
+  for (const ev of (events||[])) {
+    if (ev.shop_job_item_id && !itemStageMap[ev.shop_job_item_id]) {
+      itemStageMap[ev.shop_job_item_id] = ev.station;
+    }
+  }
+
+  const enrichedItems = allItems.map(item => ({
+    ...item,
+    current_stage: itemStageMap[item.id] || item.station_assignment || 'SAW'
+  }));
+
+  const now = new Date();
+  const totalJobs = jobs.length;
+  const totalItems = enrichedItems.length;
+  const atWeld = enrichedItems.filter(i=>i.current_stage==='WELD').length;
+  const overdue = jobs.filter(j => j.due_date && (new Date(j.due_date)-now)/86400000 < 0).length;
+  const soon    = jobs.filter(j => j.due_date && (new Date(j.due_date)-now)/86400000 >= 0 && (new Date(j.due_date)-now)/86400000 < 3).length;
+
+  document.getElementById('floor-stat-row').innerHTML = `
+    <div class="floor-stat"><div class="floor-stat-num amber">${totalJobs}</div><div class="floor-stat-label">ACTIVE JOBS</div></div>
+    <div class="floor-stat"><div class="floor-stat-num teal">${totalItems}</div><div class="floor-stat-label">ITEMS ON FLOOR</div></div>
+    <div class="floor-stat"><div class="floor-stat-num">${atWeld}</div><div class="floor-stat-label">AT WELDING</div></div>
+    <div class="floor-stat"><div class="floor-stat-num warn">${soon}</div><div class="floor-stat-label">DUE SOON</div></div>
+    <div class="floor-stat"><div class="floor-stat-num${overdue>0?' red':''}">${overdue}</div><div class="floor-stat-label">OVERDUE</div></div>
+  `;
+
+  const byStage = {};
+  STAGES.forEach(s => byStage[s] = []);
+  enrichedItems.forEach(item => {
+    const job = jobs.find(j=>j.id===item.shop_job_id);
+    if (job && byStage[item.current_stage]) byStage[item.current_stage].push({item,job,customer:custMap[job.quote_id]||'—'});
+  });
+
+  function dueClass(d) {
+    if (!d) return '';
+    const diff = (new Date(d)-now)/86400000;
+    if (diff<0) return 'overdue';
+    if (diff<3) return 'soon';
+    return '';
+  }
+  function fmtD(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
+  document.getElementById('floor-kanban').innerHTML = STAGES.map(stage => {
+    const entries = byStage[stage];
+    const cards = entries.length ? entries.map(({item,job,customer}) => {
+      const dc = dueClass(job.due_date);
+      return `<div class="kol-card" onclick="openShopScreen();document.getElementById('stab-active').click();">
+        <div class="kol-card-po">${esc(job.po_number||'—')}</div>
+        <div class="kol-card-name">${esc(item.description||'—')}</div>
+        <div class="kol-card-meta">${esc(customer)} · qty ${item.quantity||1}</div>
+        <span class="kol-card-due ${dc}">Due ${fmtD(job.due_date)}</span>
+      </div>`;
+    }).join('') : `<div class="kol-empty">—</div>`;
+
+    return `<div class="kol ${stage}">
+      <div class="kol-hdr"><span class="kol-name">${STAGE_LABELS[stage]}</span><span class="kol-cnt">${entries.length}</span></div>
+      <div class="kol-body">${cards}</div>
+    </div>`;
+  }).join('');
 }
 
 async function loadPendingDispatch() {
