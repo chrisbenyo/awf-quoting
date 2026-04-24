@@ -3206,26 +3206,6 @@ async function loadFloorBoard() {
 
   document.getElementById('floor-kanban').innerHTML = STAGES.map(stage => {
     const jobsHere = byStage[stage];
-  // Latest stage per JOB from events (not per item)
-  const {data:events} = await sbDB.from('shop_events')
-    .select('shop_job_id,station,created_at')
-    .order('created_at',{ascending:false});
-  const jobStageMap = {};
-  for (const ev of (events||[])) {
-    if (ev.shop_job_id && !jobStageMap[ev.shop_job_id]) {
-      jobStageMap[ev.shop_job_id] = normalizeStage(ev.station);
-    }
-  }
-
-  const now = new Date();
-  const allEnriched = jobs.map(job => ({
-    ...job,
-    customer: custMap[job.quote_id] || '—',
-    current_stage: normalizeStage(jobStageMap[job.id] || 'SAW')
-  }));
-
-  // Active jobs = not shipped yet
-  const activeJobs = allEnriched.filter(j => j.current_stage !== 'SHIP');
 
   const totalJobs = activeJobs.length;
   const atBurn    = activeJobs.filter(j=>j.current_stage==='BURN').length;
