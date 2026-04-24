@@ -3124,6 +3124,65 @@ async function loadShopScreen() {
 }
 
 async function loadFloorBoard() {
+  document.getElementById('floor-stat-row').innerHTML = '<div class="floor-stat"><div class="floor-stat-num amber">—</div><div class="floor-stat-label">LOADING</div></div>';
+  document.getElementById('floor-kanban').innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading floor data…</div>';
+  try {
+    const { data: jobs } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
+    if (!jobs || !jobs.length) {
+      document.getElementById('floor-stat-row').innerHTML = '';
+      document.getElementById('floor-kanban').innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor.</div>';
+      return;
+    }
+    const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
+    const custMap = {};
+    for (const qid of quoteIds) {
+      const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
+      if (q) custMap[qid] = q.customer_name || '—';
+    }
+    const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','SHIP'];
+    const LABELS = {SAW:'Sawing',BURN:'Burn/Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning/Priming',SHIP:'Ready to Ship'};
+    function norm(s) {
+      if (!s||s==='PURCHASED'||s==='DISPATCHED') return 'SAW';
+      if (s==='PRIME'||s==='CLEAN') return 'CLEAN_PRIME';
+      if (s==='BLAST'||s==='SANDBLAST') return 'SHIP';
+      return s;
+    }
+    const {data:evts} = await sbDB.from('shop_events').select('shop_job_id,station,created_at').order('created_at',{ascending:false});
+    const stageMap = {};
+    for (const ev of (evts||[])) { if (ev.shop_job_id && !stageMap[ev.shop_job_id]) stageMap[ev.shop_job_id] = norm(ev.station); }
+    const now = new Date();
+    const enriched = jobs.map(j => ({...j, customer: custMap[j.quote_id]||'—', stage: stageMap[j.id]||'SAW'}));
+    const active = enriched.filter(j => j.stage !== 'SHIP');
+    const cnt = k => active.filter(j=>j.stage===k).length;
+    const overdue = active.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000<0).length;
+    const soon = active.filter(j=>j.due_date&&(new Date(j.due_date)-now)/86400000>=0&&(new Date(j.due_date)-now)/86400000<3).length;
+    document.getElementById('floor-stat-row').innerHTML = `
+      <div class="floor-stat"><div class="floor-stat-num amber">${active.length}</div><div class="floor-stat-label">ACTIVE JOBS</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('BURN')}</div><div class="floor-stat-label">BURN / CUT</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('FIT')}</div><div class="floor-stat-label">FITTING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('WELD')}</div><div class="floor-stat-label">WELDING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num">${cnt('CLEAN_PRIME')}</div><div class="floor-stat-label">CLEANING</div></div>
+      <div class="floor-stat"><div class="floor-stat-num warn">${soon}</div><div class="floor-stat-label">DUE SOON</div></div>
+      <div class="floor-stat"><div class="floor-stat-num${overdue>0?' red':''}">${overdue}</div><div class="floor-stat-label">OVERDUE</div></div>`;
+    const byStage = {}; STAGES.forEach(s=>byStage[s]=[]);
+    enriched.forEach(j => { const s = STAGES.includes(j.stage)?j.stage:'SAW'; byStage[s].push(j); });
+    function dc(d) { if(!d) return ''; const diff=(new Date(d)-now)/86400000; return diff<0?'overdue':diff<3?'soon':''; }
+    function fd(d) { if(!d) return '—'; return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+    document.getElementById('floor-kanban').innerHTML = STAGES.map(stage => {
+      const here = byStage[stage];
+      const cards = here.length ? here.map(j => `<div class="kol-card" onclick="switchShopTab('active',document.getElementById('stab-active'))">
+        <div class="kol-card-po">${esc(j.po_number||'—')}</div>
+        <div class="kol-card-name">${esc(j.detail_name||('Detail '+j.detail_number))}</div>
+        <div class="kol-card-meta">${esc(j.customer)} · qty ${j.quantity||1}</div>
+        <span class="kol-card-due ${dc(j.due_date)}">Due ${fd(j.due_date)}</span>
+      </div>`).join('') : '<div class="kol-empty">—</div>';
+      return `<div class="kol ${stage}"><div class="kol-hdr"><span class="kol-name">${LABELS[stage]}</span><span class="kol-cnt">${here.length}</span></div><div class="kol-body">${cards}</div></div>`;
+    }).join('');
+  } catch(err) {
+    document.getElementById('floor-kanban').innerHTML = '<div style="color:var(--red);font-size:13px;padding:20px 0;">Error loading floor data.</div>';
+    console.error('loadFloorBoard error:', err);
+  }
+}
   // Shows one card per dispatched DETAIL (shop_job), not per cut piece
   // PURCHASED removed; CLEAN + PRIME merged into CLEAN_PRIME
   const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','SHIP'];
