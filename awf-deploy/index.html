@@ -24,7 +24,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:var(--bg);} ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 
 /* ── LOGIN ── */
-#login-screen{display:none;align-items:center;justify-content:center;min-height:100vh;}
+#login-screen{display:none;align-items:center;justify-content:center;min-height:100vh;position:fixed;inset:0;z-index:500;background:var(--bg);}
 #login-screen.show{display:flex;}
 .login-card{width:370px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:36px;position:relative;overflow:hidden;}
 .login-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--amber),transparent);}
@@ -1203,6 +1203,13 @@ async function loadProfile(user){
 // ============================================================
 function showLogin(){
   document.getElementById('loader').style.display='none';
+  // Close any open modals/panels so they don't bleed through to login screen
+  ['odoo-modal','cust-modal','pw-modal','pricing-modal','won-modal','dup-modal','dispatch-modal'].forEach(id=>{
+    document.getElementById(id)?.classList.remove('open');
+  });
+  document.getElementById('shop-screen')?.classList.remove('open');
+  document.getElementById('shop-screen').style.display='none';
+  document.getElementById('review-panel')?.classList.remove('open');
   document.getElementById('login-screen').classList.add('show');
   document.getElementById('app').classList.remove('visible');
 }
