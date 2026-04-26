@@ -77,6 +77,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 
 /* ── SIDEBAR ── */
 .sidebar{position:fixed;top:46px;left:0;bottom:0;width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:50;overflow:hidden;}
+.sidebar-copyright{position:fixed;bottom:0;left:0;width:var(--sidebar-w);padding:6px 12px;border-top:1px solid var(--border);background:var(--surface);text-align:center;font-size:9px;color:var(--text3);font-family:var(--font);letter-spacing:.03em;z-index:51;}
 .sidebar-top{padding:10px 8px 6px;}
 .sidebar-new{display:flex;align-items:center;gap:7px;width:100%;padding:8px 12px;border-radius:var(--radius);cursor:pointer;background:var(--amber);color:#000;border:none;font-family:var(--sans);font-size:13px;font-weight:600;margin-bottom:6px;transition:background .15s;}
 .sidebar-new:hover{background:#e09520;}
@@ -425,10 +426,8 @@ table.bom select option{background:var(--surface2);}
         <button class="filter-tab" onclick="setFilter('won',this)" style="color:var(--green)">Won</button>
       </div>
     </div>
-    <div class="quote-list" id="quote-list" style="flex:1;overflow-y:auto;"></div>
-    <div style="padding:8px 12px;border-top:1px solid var(--border);text-align:center;font-size:9px;color:var(--text3);font-family:var(--font);letter-spacing:.03em;flex-shrink:0;">
-      © 2026 Benyo Holdings, LLC · AWF
-    </div>
+    <div class="quote-list" id="quote-list" style="flex:1;overflow-y:auto;padding-bottom:28px;"></div>
+    <div class="sidebar-copyright no-print">© 2026 Benyo Holdings, LLC · AWF</div>
   </div>
 
   <div class="main-content" id="main-content">
