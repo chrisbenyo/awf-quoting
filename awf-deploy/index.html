@@ -3766,3 +3766,7 @@ document.getElementById('dispatch-modal-log').addEventListener('keydown', e => {
 document.getElementById('won-po').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('won-due').focus(); });
 document.getElementById('won-due').addEventListener('keydown', e => { if(e.key==='Enter') confirmWon(); });
 </script>
+<div class="no-print" style="text-align:center;padding:10px 0 6px;font-size:10px;color:var(--text3);font-family:var(--font);letter-spacing:.03em;">
+  © <span id="cr-year-q"></span> Benyo Holdings, LLC · All rights reserved · All Welding &amp; Fabrication Co.
+</div>
+<script>document.getElementById('cr-year-q').textContent=new Date().getFullYear();</script>
