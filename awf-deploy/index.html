@@ -426,6 +426,9 @@ table.bom select option{background:var(--surface2);}
       </div>
     </div>
     <div class="quote-list" id="quote-list"></div>
+    <div style="padding:8px 12px;border-top:1px solid var(--border);text-align:center;font-size:9px;color:var(--text3);font-family:var(--font);letter-spacing:.03em;flex-shrink:0;">
+      © 2026 Benyo Holdings, LLC · AWF
+    </div>
   </div>
 
   <div class="main-content" id="main-content">
@@ -3087,11 +3090,13 @@ let shopActiveData  = [];   // dispatched shop_jobs
 let shopCurrentTab  = 'pending';
 
 function openShopScreen() {
+  document.getElementById('shop-screen').style.display = 'block';
   document.getElementById('shop-screen').classList.add('open');
   document.getElementById('app').style.display = 'none';
   loadShopScreen();
 }
 function closeShopScreen() {
+  document.getElementById('shop-screen').style.display = 'none';
   document.getElementById('shop-screen').classList.remove('open');
   document.getElementById('app').style.display = 'flex';
 }
@@ -3769,8 +3774,13 @@ document.getElementById('dispatch-modal').addEventListener('click', e => { if(e.
 document.getElementById('dispatch-modal-log').addEventListener('keydown', e => { if(e.key==='Enter') confirmDispatchModal(); });
 document.getElementById('won-po').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('won-due').focus(); });
 document.getElementById('won-due').addEventListener('keydown', e => { if(e.key==='Enter') confirmWon(); });
+// Escape key — close any open modal or panel
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if(document.getElementById('shop-screen').classList.contains('open')) { closeShopScreen(); return; }
+  if(document.getElementById('review-panel').classList.contains('open')) { closeReviewPanel(); return; }
+  ['odoo-modal','cust-modal','pw-modal','pricing-modal','won-modal','dup-modal','dispatch-modal'].forEach(id => {
+    document.getElementById(id)?.classList.remove('open');
+  });
+});
 </script>
-<div class="no-print" style="text-align:center;padding:10px 0 6px;font-size:10px;color:var(--text3);font-family:var(--font);letter-spacing:.03em;">
-  © <span id="cr-year-q"></span> Benyo Holdings, LLC · All rights reserved · All Welding &amp; Fabrication Co.
-</div>
-<script>document.getElementById('cr-year-q').textContent=new Date().getFullYear();</script>
