@@ -3219,11 +3219,11 @@ async function loadPendingDispatch() {
     .eq('won', true);
   if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading quotes.</div>'; return; }
 
-  // 2. Already-dispatched (po_number, detail_number) pairs — fetch full records
+  // 2. Already-dispatched (quote_id, detail_number) pairs — use quote_id for null-safe matching
   const { data: dispatched } = await sbDB.from('shop_jobs').select('*');
-  const dispatchedSet = new Set((dispatched||[]).map(d => `${d.po_number}::${d.detail_number}`));
+  const dispatchedSet = new Set((dispatched||[]).map(d => `${d.quote_id}::${d.detail_number}`));
   const dispatchedJobMap = {};
-  for (const d of (dispatched||[])) dispatchedJobMap[`${d.po_number}::${d.detail_number}`] = d;
+  for (const d of (dispatched||[])) dispatchedJobMap[`${d.quote_id}::${d.detail_number}`] = d;
 
   // 3. Load line items for all won quotes to find details
   if (!wonQuotes || !wonQuotes.length) {
@@ -3268,7 +3268,7 @@ async function loadPendingDispatch() {
       const allItems = [...d.items, ...d.otherItems];
       if (!allItems.length && !d.meta) continue;
       const detailNum = String(parseInt(di)+1).padStart(2,'0');
-      const key = `${q.po_number}::${detailNum}`;
+      const key = `${q.id}::${detailNum}`;
       pendingDetails.push({
         di: parseInt(di),
         detailNum,
@@ -3527,10 +3527,11 @@ async function dispatchDetail(ei, deti, editedName, logNumber) {
   const detailName = editedName || det.meta?.description || det.meta?.item_data?.detail_name || '';
   const detailNum  = det.detailNum; // already padStart(2,'0')
 
-  // Guard: check if already dispatched (handles stale UI / double-click / key mismatch)
+  // Guard: check if already dispatched (handles stale UI / double-click)
+  // Use quote_id + detail_number for precise match — po_number can be null which causes false positives
   const { data: existing } = await sbDB.from('shop_jobs')
     .select('id')
-    .eq('po_number', q.po_number)
+    .eq('quote_id', q.id)
     .eq('detail_number', detailNum)
     .limit(1);
   if (existing && existing.length > 0) {
@@ -3606,8 +3607,8 @@ async function releaseAllForPO(ei) {
   for (let deti = 0; deti < entry.details.length; deti++) {
     const det = entry.details[deti];
     if (det.dispatched) continue;
-    // Guard against duplicate dispatch
-    const { data: existing } = await sbDB.from('shop_jobs').select('id').eq('po_number',q.po_number).eq('detail_number',det.detailNum).limit(1);
+    // Guard against duplicate dispatch — use quote_id for precise match
+    const { data: existing } = await sbDB.from('shop_jobs').select('id').eq('quote_id',q.id).eq('detail_number',det.detailNum).limit(1);
     if (existing && existing.length > 0) continue; // already there, skip silently
     const detailName = det.meta ? (det.meta.description || det.meta.item_data?.detail_name || '') : '';
     const allLineItems = [
