@@ -3515,12 +3515,26 @@ async function dispatchDetail(ei, deti, editedName, logNumber) {
 
   // Use values passed from modal
   const detailName = editedName || det.meta?.description || det.meta?.item_data?.detail_name || '';
+  const detailNum  = det.detailNum; // already padStart(2,'0')
+
+  // Guard: check if already dispatched (handles stale UI / double-click / key mismatch)
+  const { data: existing } = await sbDB.from('shop_jobs')
+    .select('id')
+    .eq('po_number', q.po_number)
+    .eq('detail_number', detailNum)
+    .limit(1);
+  if (existing && existing.length > 0) {
+    toast(`Det. ${detailNum} already on floor — reloading…`, 'err');
+    if (btn) { btn.disabled = false; btn.textContent = 'Release to Floor →'; }
+    await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
+    return;
+  }
 
   // 1. Create shop_job row
   const jobRec = {
     quote_id:      q.id,
     po_number:     q.po_number,
-    detail_number: det.detailNum,
+    detail_number: detailNum,
     detail_name:   detailName,
     quantity:      det.meta?.item_data?.quantity || 1,
     due_date:      q.due_date || null,
@@ -3582,6 +3596,9 @@ async function releaseAllForPO(ei) {
   for (let deti = 0; deti < entry.details.length; deti++) {
     const det = entry.details[deti];
     if (det.dispatched) continue;
+    // Guard against duplicate dispatch
+    const { data: existing } = await sbDB.from('shop_jobs').select('id').eq('po_number',q.po_number).eq('detail_number',det.detailNum).limit(1);
+    if (existing && existing.length > 0) continue; // already there, skip silently
     const detailName = det.meta ? (det.meta.description || det.meta.item_data?.detail_name || '') : '';
     const allLineItems = [
       ...det.items.map((item, idx) => ({...item, _sym: String(idx+1), _isOther: false})),
