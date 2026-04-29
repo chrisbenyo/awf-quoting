@@ -41,14 +41,28 @@ export default async (req) => {
   }
 
   if (url.searchParams.get("fixRLS")) {
-    const metaRes = await fetch(`${SUPABASE_URL}/pg-meta/v1/query`, {
-      method: 'POST',
-      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: RLS_FIX_SQL })
-    });
-    const data = await metaRes.json();
-    return new Response(JSON.stringify(data), {
-      status: metaRes.status,
+    // Run each policy statement individually via the REST API using service role
+    const statements = [
+      `DROP POLICY IF EXISTS "quotes_admin_select" ON public.quotes`,
+      `CREATE POLICY "quotes_admin_select" ON public.quotes FOR SELECT USING (auth.uid() = user_id OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))`,
+      `DROP POLICY IF EXISTS "line_items_admin_select" ON public.line_items`,
+      `CREATE POLICY "line_items_admin_select" ON public.line_items FOR SELECT USING (EXISTS (SELECT 1 FROM public.quotes q WHERE q.id = quote_id AND (q.user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))))`
+    ];
+    const results = [];
+    for (const sql of statements) {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec`, {
+          method: 'POST',
+          headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql })
+        });
+        results.push({ sql: sql.substring(0,40), status: r.status, body: (await r.text()).substring(0,100) });
+      } catch(e) {
+        results.push({ sql: sql.substring(0,40), error: e.message });
+      }
+    }
+    return new Response(JSON.stringify(results), {
+      status: 200,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
