@@ -3238,9 +3238,10 @@ async function loadPendingDispatch() {
     quoteIds.map(qid =>
       sbDB.from('line_items').select('*').eq('quote_id', qid).order('sort_order')
         .then(({ data }) => (data || []).map(i => ({...i, _qid: qid})))
+        .catch(() => [])
     )
   );
-  const allItems = allItemArrays.flat();
+  const allItems = allItemArrays.flat().filter(Boolean);
 
   // Build detail map per quote
   const quoteDetailMap = {};
