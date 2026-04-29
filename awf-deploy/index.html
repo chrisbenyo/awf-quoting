@@ -3768,13 +3768,18 @@ async function loadActiveJobs() {
 }
 
 async function updateJobStage(jobId, newStation) {
-  // Insert a synthetic checkin event to move the job to the chosen stage
+  // Get the job details first so we can populate required event fields
+  const { data: job } = await sbDB.from('shop_jobs').select('po_number,detail_number').eq('id', jobId).single();
+  const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
   const { error } = await sbDB.from('shop_events').insert({
-    shop_job_id: jobId,
-    station: newStation,
-    event_type: 'checkin',
-    operator_name: 'Office',
-    notes: 'Stage updated from office'
+    shop_job_id:     jobId,
+    po_number:       job?.po_number || null,
+    detail_number:   job?.detail_number || null,
+    station:         newStation,
+    tablet_station:  newStation,
+    event_type:      'checkin',
+    operator_initials: initials,
+    notes:           'Stage updated from office'
   });
   if (error) { toast('Stage update error: ' + error.message, 'err'); await loadActiveJobs(); return; }
   toast(`Moved to ${newStation} ✓`, 'ok');
