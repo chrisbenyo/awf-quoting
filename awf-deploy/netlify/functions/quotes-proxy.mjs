@@ -2,13 +2,32 @@ const SUPABASE_URL = "https://evfkoeuhhgfmdrsnifyd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq";
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+const RLS_FIX_SQL = `
+DO $$
+BEGIN
+  DROP POLICY IF EXISTS "quotes_admin_select" ON public.quotes;
+  CREATE POLICY "quotes_admin_select" ON public.quotes
+    FOR SELECT USING (
+      auth.uid() = user_id
+      OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    );
+  DROP POLICY IF EXISTS "line_items_admin_select" ON public.line_items;
+  CREATE POLICY "line_items_admin_select" ON public.line_items
+    FOR SELECT USING (
+      EXISTS (
+        SELECT 1 FROM public.quotes q
+        WHERE q.id = line_items.quote_id
+          AND (q.user_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin'))
+      )
+    );
+END $$;
+`;
+
 export default async (req) => {
   const url = new URL(req.url);
 
-  // Admin: confirm a user's email by ID (POST with ?adminConfirm=<userId>)
-  if (req.method === 'POST') {
+  if (req.method === 'POST' && url.searchParams.get("adminConfirm")) {
     const userId = url.searchParams.get("adminConfirm");
-    if (!userId) return new Response(JSON.stringify({ error: "missing userId" }), { status: 400 });
     const sbRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
       method: 'PUT',
       headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
@@ -17,6 +36,19 @@ export default async (req) => {
     const data = await sbRes.json();
     return new Response(JSON.stringify(data), {
       status: sbRes.status,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+    });
+  }
+
+  if (req.method === 'POST' && url.searchParams.get("fixRLS")) {
+    const metaRes = await fetch(`${SUPABASE_URL}/pg-meta/v1/query`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: RLS_FIX_SQL })
+    });
+    const data = await metaRes.json();
+    return new Response(JSON.stringify(data), {
+      status: metaRes.status,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
