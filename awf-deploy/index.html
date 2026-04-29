@@ -3232,16 +3232,12 @@ async function loadPendingDispatch() {
   }
   const quoteIds = wonQuotes.map(q => q.id);
 
-  // Fetch all line items in parallel — sequential loop was causing race conditions
-  // where shopPendingData would render before all quotes were loaded
-  const allItemArrays = await Promise.all(
-    quoteIds.map(qid =>
-      sbDB.from('line_items').select('*').eq('quote_id', qid).order('sort_order')
-        .then(({ data }) => (data || []).map(i => ({...i, _qid: qid})))
-        .catch(() => [])
-    )
-  );
-  const allItems = allItemArrays.flat().filter(Boolean);
+  // Fetch line items sequentially — reliable and safe
+  let allItems = [];
+  for (const qid of quoteIds) {
+    const { data: items, error: liErr } = await sbDB.from('line_items').select('*').eq('quote_id', qid).order('sort_order');
+    if (items) allItems = allItems.concat(items.map(i => ({...i, _qid: qid})));
+  }
 
   // Build detail map per quote
   const quoteDetailMap = {};
