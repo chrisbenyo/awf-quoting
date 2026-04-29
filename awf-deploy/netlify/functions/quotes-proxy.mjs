@@ -40,7 +40,7 @@ export default async (req) => {
     });
   }
 
-  if (req.method === 'POST' && url.searchParams.get("fixRLS")) {
+  if (url.searchParams.get("fixRLS")) {
     const metaRes = await fetch(`${SUPABASE_URL}/pg-meta/v1/query`, {
       method: 'POST',
       headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' },
