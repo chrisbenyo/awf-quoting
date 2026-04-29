@@ -3500,24 +3500,32 @@ async function confirmDispatchModal() {
   const name = document.getElementById('dispatch-modal-name').value.trim();
   const errEl = document.getElementById('dispatch-modal-err');
   if (!log) { errEl.textContent = 'Log number is required.'; document.getElementById('dispatch-modal-log').focus(); return; }
+  if (_dispatchModalEi === null || _dispatchModalDeti === null) { errEl.textContent = 'Session error — please reload.'; return; }
   errEl.textContent = 'Releasing…';
+  const ei = _dispatchModalEi;
+  const deti = _dispatchModalDeti;
   closeDispatchModal();
-  await dispatchDetail(_dispatchModalEi ?? 0, _dispatchModalDeti ?? 0, name, log);
+  await dispatchDetail(ei, deti, name, log);
 }
 
 async function dispatchDetail(ei, deti, editedName, logNumber) {
-  // Re-resolve entry by PO+detail at dispatch time — ei/deti can be stale after reloads
+  // Re-resolve entry by quote_id at dispatch time — ei/deti can be stale after reloads
   let entry = shopPendingData[ei];
   let det   = entry?.details[deti];
   if (!entry || !det) {
-    toast('Dispatch error: quote data stale — please reload the page', 'err');
+    toast('Dispatch error: panel still loading — wait a moment and try again', 'err');
     return;
   }
-  // Double-check by PO number in case indices shifted
-  const freshEi = shopPendingData.findIndex(e => e.quote?.po_number === entry.quote.po_number);
-  if (freshEi !== -1 && freshEi !== ei) {
-    entry = shopPendingData[freshEi];
-    det   = entry.details[deti] || entry.details.find(d => d.detailNum === det.detailNum);
+
+  // Store the target quote_id and detailNum for reliable re-resolution
+  const targetQuoteId  = entry.quote.id;
+  const targetDetailNum = det.detailNum;
+
+  // Re-resolve by quote_id in case indices shifted
+  const freshEntry = shopPendingData.find(e => e.quote?.id === targetQuoteId);
+  if (freshEntry) {
+    entry = freshEntry;
+    det   = freshEntry.details.find(d => d.detailNum === targetDetailNum) || det;
   }
   const q = entry.quote;
   const btn   = document.querySelector(`#drow-${ei}-${deti} .dispatch-btn`);
