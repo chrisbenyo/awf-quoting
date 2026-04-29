@@ -326,6 +326,7 @@ table.bom select option{background:var(--surface2);}
 .stage-PRIME{background:#2a2a1a;color:#d4d42d;border-color:#5a5a1a;}
 .stage-BLAST{background:#2a1a2a;color:#d42dd4;border-color:#5a1a5a;}
 .stage-SHIP{background:var(--green-dim);color:var(--green);border-color:#1a6030;}
+.stage-SHIPPED{background:#1a1a2e;color:#666;border-color:#333;text-decoration:line-through;}
 
 /* ── FLOOR BOARD KANBAN ── */
 .floor-stat-row{display:flex;gap:12px;flex-wrap:wrap;padding:16px 24px;background:var(--surface);border-bottom:1px solid var(--border);}
@@ -3164,7 +3165,7 @@ async function loadFloorBoard() {
       customer: custMap[j.quote_id]||'—',
       stage: stageMap[j.id]||'SAW'
     }));
-    const active  = enriched.filter(j => j.stage !== 'SHIP');
+    const active  = enriched.filter(j => j.stage !== 'SHIP' && j.stage !== 'SHIPPED');
     const cnt     = k => active.filter(j=>j.stage===k).length;
     const overdue = active.filter(j=>j.due_date&&(new Date(j.due_date)-now)<0).length;
     const soon    = active.filter(j=>{const d=new Date(j.due_date)-now;return j.due_date&&d>=0&&d<3*86400000;}).length;
@@ -3179,7 +3180,8 @@ async function loadFloorBoard() {
     // Build kanban columns
     const byStage = {};
     STAGES.forEach(s => byStage[s] = []);
-    enriched.forEach(j => { const s = STAGES.includes(j.stage)?j.stage:'SAW'; byStage[s].push(j); });
+    // SHIPPED jobs are removed from board entirely — they've left the building
+    enriched.filter(j => j.stage !== 'SHIPPED').forEach(j => { const s = STAGES.includes(j.stage)?j.stage:'SAW'; byStage[s].push(j); });
     function dueCls(d) {
       if (!d) return '';
       const diff = (new Date(d)-now)/86400000;
@@ -3692,7 +3694,7 @@ async function loadActiveJobs() {
     }
   }
 
-  // Enrich jobs with customer, won_at, and stage
+  // Enrich jobs with customer, won_at, and stage — exclude SHIPPED (off the floor)
   const enriched = jobs.map(job => {
     const s = stageMap[job.id];
     const info = quoteInfoMap[job.quote_id] || {};
@@ -3703,7 +3705,7 @@ async function loadActiveJobs() {
       stage: s ? s.station : 'DISPATCHED',
       stageActive: s ? s.active : false
     };
-  });
+  }).filter(job => job.stage !== 'SHIPPED');
 
   // Sort
   const {col, dir} = activeJobsSort;
@@ -3720,7 +3722,7 @@ async function loadActiveJobs() {
     return `<th style="cursor:pointer;user-select:none;${active?'color:var(--teal);':''}" onclick="sortActiveJobs('${colKey}')">${label}${arrow}</th>`;
   }
 
-  const ALL_STAGES = ['DISPATCHED','SAW','BURN','PURCHASED','FIT','WELD','CLEAN','PRIME','SANDBLAST','SHIP'];
+  const ALL_STAGES = ['DISPATCHED','SAW','BURN','PURCHASED','FIT','WELD','CLEAN','PRIME','SANDBLAST','SHIP','SHIPPED'];
 
   // Store for filtering
   _activeRows = enriched;
