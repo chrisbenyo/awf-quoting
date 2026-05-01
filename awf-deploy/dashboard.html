@@ -221,16 +221,16 @@ function normCust(raw) {
   return raw;
 }
 
-const HLABELS = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar'];
-const H25 = [821324,583491,824355,881963,1052211,1012733,863210,859272,884821,1140567,1171742];
-const H26 = [906952,889274,1367820,933525,1035669,1269595,937617,1081375,1224766,1004998,869535];
+const HLABELS = ['May','Jun','Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr'];
+const H25 = [821324,583491,824355,881963,1052211,1012733,863210,859272,884821,1140567,1171742,940111];
+const H26 = [906952,889274,1367820,933525,1035669,1269595,937617,1081375,1224766,1004998,869535,764000];
 
 let vc = null;
 function buildChart(aprLive, extraMonths) {
   // Calculate how many full historical months we have (May 2025 = month 0, Mar 2026 = month 10)
   // Apr 2026 = month 11, May 2026 = month 12, etc.
   const monthsSinceMay2025 = (CUR_YEAR - 2025) * 12 + CUR_MONTH - 4; // months after May 2025
-  const histCount = Math.min(monthsSinceMay2025, 11); // we have H26 data for up to 11 months
+  const histCount = Math.min(monthsSinceMay2025, 12); // we have H26 data for up to 12 months (May25-Apr26)
 
   // Build labels: historical months + current month + extra
   const histLabels = HLABELS.slice(0, histCount);
