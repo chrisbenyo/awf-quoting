@@ -227,10 +227,28 @@ const H26 = [906952,889274,1367820,933525,1035669,1269595,937617,1081375,1224766
 
 let vc = null;
 function buildChart(aprLive, extraMonths) {
-  const labels = [...HLABELS, CUR_MONTH_NAME.slice(0,3), ...extraMonths.map(m=>m.label)];
-  const hist = [...H26, null, ...new Array(extraMonths.length).fill(null)];
-  const live = [...new Array(11).fill(null), aprLive, ...extraMonths.map(m=>m.value)];
-  const prior = [...H25, 1145501, ...new Array(extraMonths.length).fill(null)];
+  // Calculate how many full historical months we have (May 2025 = month 0, Mar 2026 = month 10)
+  // Apr 2026 = month 11, May 2026 = month 12, etc.
+  const monthsSinceMay2025 = (CUR_YEAR - 2025) * 12 + CUR_MONTH - 4; // months after May 2025
+  const histCount = Math.min(monthsSinceMay2025, 11); // we have H26 data for up to 11 months
+
+  // Build labels: historical months + current month + extra
+  const histLabels = HLABELS.slice(0, histCount);
+  // If current month not already in histLabels, add it
+  const curLabel = CUR_MONTH_NAME.slice(0,3);
+  const labels = [...histLabels, curLabel, ...extraMonths.map(m=>m.label)];
+
+  // hist: H26 data for historical months, null for current and extra
+  const hist = [...H26.slice(0, histCount), null, ...new Array(extraMonths.length).fill(null)];
+
+  // live: nulls for historical months, aprLive for current, extra values
+  const live = [...new Array(histCount).fill(null), aprLive, ...extraMonths.map(m=>m.value)];
+
+  // prior: H25 data for historical months, prior year same month, nulls for extra
+  // H25 runs same months as H26 (May25-Mar26 = May24-Mar25)
+  // For Apr 2026, prior = Apr 2025 = 940111; for May 2026, prior = May 2025 = H25[0]=821324
+  const priorCurMonth = PRIOR[CUR_MONTH] || 917456;
+  const prior = [...H25.slice(0, histCount), priorCurMonth, ...new Array(extraMonths.length).fill(null)];
 
   if (vc) vc.destroy();
   vc = new Chart(document.getElementById('volChart'), {
