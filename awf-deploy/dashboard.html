@@ -90,33 +90,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <div class="logo-text"><strong>All Weld Fabrication</strong>Quote Dashboard</div>
   </div>
   <div class="topbar-right">
-    <a href="https://quotes.allweldfab.com" class="nav-link">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Quoting app</a>
-    <a href="https://shopfloor.allweldfab.com" class="nav-link">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ Shop floor</a>
+    <a href="https://quotes.allweldfab.com" class="nav-link">→ Quoting app</a>
+    <a href="https://shopfloor.allweldfab.com" class="nav-link">→ Shop floor</a>
     <span class="live-badge"><span class="live-dot"></span>live</span>
-    <button class="refresh-btn" onclick="loadLive()">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ» Refresh</button>
+    <button class="refresh-btn" onclick="loadLive()">↻ Refresh</button>
   </div>
 </div>
 
 <div class="main">
 
 <div class="seam-note">
-  ÃÂÃÂ°ÃÂÃÂÃÂÃÂÃÂÃÂ Historical thru Apr 16 2026 from manual tracker ÃÂÃÂÃÂÃÂ· Live from quoting engine Apr 17+ ÃÂÃÂÃÂÃÂ· Quotes &gt;$100K counted at 50% ÃÂÃÂÃÂÃÂ· Customer names fuzzy-matched
+  📅 Historical thru Apr 16 2026 from manual tracker · Live from quoting engine Apr 17+ · Quotes &gt;$100K counted at 50% · Customer names fuzzy-matched
 </div>
 
 <div class="metric-grid">
-  <div class="metric"><div class="metric-label" id="m1label">— total</div><div class="metric-value" id="m1val">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</div><div class="metric-sub" id="m1sub">loading...</div></div>
-  <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="m2val">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</div><div class="metric-sub" id="m2sub">loading...</div></div>
-  <div class="metric"><div class="metric-label">Open quotes (live)</div><div class="metric-value" id="m3val">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ</div><div class="metric-sub" id="m3sub">loading...</div></div>
+  <div class="metric"><div class="metric-label" id="m1label">loading...</div><div class="metric-value" id="m1val">—</div><div class="metric-sub" id="m1sub">loading...</div></div>
+  <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="m2val">—</div><div class="metric-sub" id="m2sub">loading...</div></div>
+  <div class="metric"><div class="metric-label">Open quotes (live)</div><div class="metric-value" id="m3val">—</div><div class="metric-sub" id="m3sub">loading...</div></div>
   <div class="metric"><div class="metric-label">All-time avg</div><div class="metric-value">$917K</div><div class="metric-sub">37-month baseline (thru Apr '26)</div></div>
 </div>
 
 <div class="chart-row">
   <div class="card">
-    <div class="card-title">Monthly quote volume ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ 24 months</div>
+    <div class="card-title">Monthly quote volume — 24 months</div>
     <div class="leg-row">
-      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2025ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ26 historical</span>
+      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2025–26 historical</span>
       <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>live (quoting engine)</span>
-      <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2024ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ25</span>
+      <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2024–25</span>
       <span class="leg"><span class="leg-sq" style="background:#4ade80;border-radius:0;height:2px;width:14px;"></span>avg $936K</span>
     </div>
     <div style="position:relative;height:220px;">
@@ -124,7 +124,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     </div>
   </div>
   <div class="card">
-    <div class="card-title">Recent quotes ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ live</div>
+    <div class="card-title">Recent quotes — live</div>
     <div id="recentQuotes"><div class="empty-state">Loading...</div></div>
   </div>
 </div>
@@ -133,13 +133,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   <div class="win-card" onclick="toggleWin()">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div class="card-title" style="margin:0;">Overall win rate</div>
-      <span style="font-size:11px;color:var(--text3);" id="winToggle">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¼ detail</span>
+      <span style="font-size:11px;color:var(--text3);" id="winToggle">▼ detail</span>
     </div>
     <div class="win-big">19.0%</div>
-    <div style="font-size:11px;color:var(--text3);">$5.84M won / $30.7M quoted ÃÂÃÂÃÂÃÂ· all history</div>
+    <div style="font-size:11px;color:var(--text3);">$5.84M won / $30.7M quoted · all history</div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px;" id="liveWonLine">loading...</div>
     <div class="win-detail" id="winDetail">
-      <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">Historical rates ÃÂÃÂÃÂÃÂ· Jay Enn from Jan 2026 ÃÂÃÂÃÂÃÂ· sorted by rate</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">Historical rates · Jay Enn from Jan 2026 · sorted by rate</div>
       <table class="win-table">
         <thead><tr><th>Customer</th><th>Win %</th><th style="width:60px;">Rate</th><th>Quoted</th></tr></thead>
         <tbody id="winRows"></tbody>
@@ -148,7 +148,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Weekly won ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ by won date</div>
+    <div class="card-title">Weekly won -- by won date</div>
     <div class="leg-row">
       <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>below goal</span>
       <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
@@ -166,17 +166,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Won by month ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ YoY</div>
-    <div class="leg-row">
-      <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
-      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2026 hist</span>
-      <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>2026 live</span>
-    </div>
+    <div class="card-title">Won by month -- YoY</div>
+    <div class="leg-row"><span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span><span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2026 hist</span><span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>2026 live</span></div>
     <div id="wonMonthRows" style="overflow-y:auto;max-height:260px;"></div>
   </div>
 
   <div class="card">
-    <div class="card-title" id="paceTitle">ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ pace</div>
+    <div class="card-title" id="paceTitle">-- pace</div>
     <div id="paceContent"><div class="empty-state">Loading...</div></div>
   </div>
 </div>
@@ -187,12 +183,14 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 <script>
 const PROXY = '/api/quotes-proxy';
 const ELEPHANT = 100000;
-const NOW = new Date();
-const CUR_YEAR = NOW.getFullYear();
-const CUR_MONTH = NOW.getMonth();
-const CUR_MONTH_NAME = NOW.toLocaleString('default',{month:'long'});
-const DAYS_IN_MONTH = new Date(CUR_YEAR, CUR_MONTH+1, 0).getDate();
-const SINCE = `${CUR_YEAR}-${String(CUR_MONTH+1).padStart(2,'0')}-01T00:00:00`;
+
+
+const NOW=new Date(),CUR_YEAR=NOW.getFullYear(),CUR_MONTH=NOW.getMonth();
+const CUR_MONTH_NAME=NOW.toLocaleString('default',{month:'long'});
+const DAYS_IN_MONTH=new Date(CUR_YEAR,CUR_MONTH+1,0).getDate();
+const SINCE=`${CUR_YEAR}-${String(CUR_MONTH+1).padStart(2,'0')}-01T00:00:00`;
+const PRIOR={4:906952,5:889274,6:1367820,7:933525,8:1035669,9:1269595,10:937617,11:1081375,0:1224766,1:1004998,2:869535,3:940111};
+const priorMonthVal=PRIOR[CUR_MONTH]||917456;
 
 function elephantAdj(v) { return v > ELEPHANT ? v * 0.5 : v; }
 function fmtK(n) { return '$' + Math.round(n/1000) + 'K'; }
@@ -258,7 +256,7 @@ function toggleWin() {
   const d = document.getElementById('winDetail');
   const t = document.getElementById('winToggle');
   d.classList.toggle('open');
-  t.textContent = d.classList.contains('open') ? 'ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ² hide' : 'ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ¼ detail';
+  t.textContent = d.classList.contains('open') ? '▲ hide' : '▼ detail';
 }
 
 const CUSTS = [
@@ -279,82 +277,58 @@ CUSTS.forEach(c => {
   const bc = !c.r?'#3d4260':c.r>=28?'#4ade80':c.r<12?'#f87171':'#185FA5';
   tr.innerHTML = `<td>${c.n}</td><td>${rs}</td>
     <td><div class="bar-bg"><div class="bar-fill" style="width:${bw}%;background:${bc};"></div></div></td>
-    <td style="color:var(--text3);">${c.q?fmtK(c.q):'ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ'}</td>`;
+    <td style="color:var(--text3);">${c.q?fmtK(c.q):'—'}</td>`;
   tb.appendChild(tr);
 });
 
-// Weekly won ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ spreadsheet through 4/13, live from 4/20+ via won_at
-const WKS_HIST = [
+const WKS_HIST=[
   {label:'1/6',v:15539},{label:'1/13',v:9945},{label:'1/19',v:47885},{label:'1/26',v:14003},
   {label:'2/2',v:63616},{label:'2/9',v:16281},{label:'2/16',v:68803},{label:'2/23',v:57215},
   {label:'3/2',v:45809},{label:'3/9',v:40626},{label:'3/16',v:29884},{label:'3/23',v:21505},
   {label:'3/30',v:55680},{label:'4/6',v:35751},{label:'4/13',v:26500},
 ];
 const wDiv=document.getElementById('weeklyRows');
-function buildWeeklyChart(weeks) {
-  wDiv.innerHTML='';
-  const maxV=Math.max(...weeks.map(w=>w.v),1);
-  const gl=52000;
+function buildWeeklyChart(weeks){
+  wDiv.innerHTML='';const maxV=Math.max(...weeks.map(w=>w.v),1),gl=52000;
   weeks.forEach(w=>{
-    const pct=(w.v/maxV)*100, gpct=Math.min(100,(gl/maxV)*100);
-    const c=w.v>=gl?'#4ade80':'#185FA5';
-    const r=document.createElement('div'); r.className='wk-row';
+    const pct=(w.v/maxV)*100,gpct=Math.min(100,(gl/maxV)*100),c=w.v>=gl?'#4ade80':'#185FA5';
+    const r=document.createElement('div');r.className='wk-row';
     r.innerHTML=`<span class="wk-label">${w.label}</span>
-      <div class="wk-bar-wrap">
-        <div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
+      <div class="wk-bar-wrap"><div class="wk-bar" style="width:${pct}%;background:${c};opacity:.85;"></div>
         <div style="position:absolute;left:${gpct}%;top:0;width:1.5px;height:100%;background:#5a5d72;opacity:.5;"></div>
-      </div>
-      <span class="wk-val">${fmtK(w.v)}</span>`;
-    wDiv.appendChild(r);
-  });
+      </div><span class="wk-val">${fmtK(w.v)}</span>`;
+    wDiv.appendChild(r);});
 }
 buildWeeklyChart(WKS_HIST);
 
 buildChart(0,[]);
 
 
-const WON_MONTHS_2025=[131459,188272,223991,174415,230741,143309,147676,156113,166444,193575,108123,211512];
-const WON_MONTHS_2026_HIST=[133884,200335,170833];
-const MONTH_NAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function buildWonMonthChart(liveWonByMonth){
-  const el=document.getElementById('wonMonthRows');
-  if(!el)return;
-  el.innerHTML='';
-  const won2026=[...WON_MONTHS_2026_HIST];
-  Object.entries(liveWonByMonth).forEach(([k,v])=>{
-    const mo=parseInt(k.split('-')[1])-1;
-    won2026[mo]=(won2026[mo]||0)+v;
-  });
-  const allVals=[...WON_MONTHS_2025,...won2026.filter(v=>v!=null&&v>0)];
-  const maxV=Math.max(...allVals,1);
-  MONTH_NAMES.forEach((mon,i)=>{
-    const v25=WON_MONTHS_2025[i]||0,v26=won2026[i];
-    const has26=v26!=null&&v26>0;
+const WON_2025=[131459,188272,223991,174415,230741,143309,147676,156113,166444,193575,108123,211512];
+const WON_2026H=[133884,200335,170833];
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function buildWonMonthChart(live){
+  const el=document.getElementById('wonMonthRows');if(!el)return;el.innerHTML='';
+  const w26=[...WON_2026H];
+  Object.entries(live).forEach(([k,v])=>{const mo=parseInt(k.split('-')[1])-1;w26[mo]=(w26[mo]||0)+v;});
+  const maxV=Math.max(...WON_2025,...w26.filter(v=>v>0),1);
+  MN.forEach((mon,i)=>{
+    const v25=WON_2025[i]||0,v26=w26[i],has26=v26!=null&&v26>0;
     const p25=(v25/maxV)*100,p26=has26?(v26/maxV)*100:0;
     const yoy=v25>0&&has26?((v26-v25)/v25*100):null;
-    const yc=yoy>=0?'#4ade80':'#f87171';
-    const isLive=Object.keys(liveWonByMonth).some(k=>parseInt(k.split('-')[1])-1===i);
-    const c26=isLive?'#2dd4bf':'#185FA5';
-    const r=document.createElement('div');
-    r.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;';
-    r.innerHTML<`<span style="width:28px;color:var(--text3);font-family:var(--font);font-size:10px;">${mon}</span>
+    const isL=Object.keys(live).some(k=>parseInt(k.split('-')[1])-1===i);
+    const c26=isL?'#2dd4bf':'#185FA5',yc=yoy>=0?'#4ade80':'#f87171';
+    const r=document.createElement('div');r.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:6px;';
+    r.innerHTML=`<span style="width:28px;color:var(--text3);font-size:10px;font-family:var(--font);">${mon}</span>
       <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
-        <div style="display:flex;align-items:center;gap:4px;">
-          <div style="width:20px;font-size:9px;color:var(--text3);text-align:right;">25</div>
-          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">
-            <div style="position:absolute;left:0;top:0;height:8px;width:${p25}%;background:#3d4260;border-radius:2px;"></div>
-          </div>
-          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;color:var(--text2);">${fmtK(v25)}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:4px;">
-          <div style="width:20px;font-size:9px;color:var(--text3);text-align:right;">26</div>
-          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">
-            ${has26?`<div style="position:absolute;left:0;top:0;height:8px;width:${p26}%;background:${c26};border-radius:2px;"></div>`:''}
-          </div>
-          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;${has26?'color:var(--text)':'color:var(--text3)'};">${has26?fmtK(v26):'ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ'}</span>
+        <div style="display:flex;align-items:center;gap:4px;"><div style="width:20px;font-size:9px;color:var(--text3);text-align:right;">25</div>
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;"><div style="position:absolute;left:0;top:0;height:8px;width:${p25}%;background:#3d4260;border-radius:2px;"></div></div>
+          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;color:var(--text2);">${fmtK(v25)}</span></div>
+        <div style="display:flex;align-items:center;gap:4px;"><div style="width:20px;font-size:9px;color:var(--text3);text-align:right;">26</div>
+          <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">${has26?`<div style="position:absolute;left:0;top:0;height:8px;width:${p26}%;background:${c26};border-radius:2px;"></div>`:''}</div>
+          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;${has26?'color:var(--text)':'color:var(--text3)'};">${has26?fmtK(v26):'--'}</span>
           ${yoy!==null?`<span style="width:34px;text-align:right;font-size:9px;color:${yc};">${yoy>=0?'+':''}${Math.round(yoy)}%</span>`:'<span style="width:34px;"></span>'}
-        </div>
-      </div>`;
+        </div></div>`;
     el.appendChild(r);
   });
 }
@@ -365,13 +339,11 @@ async function loadLive() {
     const now = new Date();
     const today = now.getDate();
 
-    // Fetch current month quotes for metrics
     const res = await fetch(`${PROXY}?since=${SINCE}&limit=500`);
-    // Also fetch all 2026 quotes to get won_at data for weekly/monthly charts
-    const resWon = await fetch(`${PROXY}?since=2026-01-01T00:00:00&limit=1000`);
+    const resAll = await fetch(`${PROXY}?since=2026-01-01T00:00:00&limit=1000`);
     const allLive = await res.json();
     if (!Array.isArray(allLive)) throw new Error(JSON.stringify(allLive));
-    const allWon = await resWon.json().catch(()=>[]);
+    const allYear = await resAll.json().catch(()=>[]);
 
     let aprLive=0, aprWon=0, aprOpen=0, aprOpenVal=0;
     const byMonth={};
@@ -383,7 +355,7 @@ async function loadLive() {
       if (yr===CUR_YEAR && mo===CUR_MONTH) {
         aprLive += adj;
         if (q.won) aprWon += adj; else { aprOpen++; aprOpenVal += adj; }
-      } else if (yr>CUR_YEAR || (yr===CUR_YEAR && mo>CUR_MONTH)) {
+      } else if (yr>CUR_YEAR||(yr===CUR_YEAR&&mo>CUR_MONTH)) {
         const key=`${yr}-${String(mo+1).padStart(2,'0')}`;
         byMonth[key]=(byMonth[key]||0)+adj;
       }
@@ -394,91 +366,77 @@ async function loadLive() {
       return {label:new Date(+yr,+mo-1,1).toLocaleString('default',{month:'short'}),value:v};
     });
     buildChart(aprLive, extraMonths);
-
-    // Weekly won live from 4/20+ using won_at
-    const wonByWeekMap={};
-    const liveStart=new Date(2026,3,20);
-    let wcur=new Date(liveStart);
-    while(wcur<=new Date()){
-      const k=`${wcur.getMonth()+1}/${wcur.getDate()}`;
-      wonByWeekMap[k]=0;
-      wcur.setDate(wcur.getDate()+7);
-    }
-    allWon.filter(q=>q.won&&q.won_at).forEach(q=>{
-      const d=new Date(q.won_at);
-      if(d<liveStart)return;
-      const day=d.getDay(),diff=day===0?-6:1-day;
-      const mon=new Date(d);mon.setDate(d.getDate()+diff);mon.setHours(0,0,0,0);
+    const wonByWeekMap={},wkStart=new Date(2026,3,20);let wc=new Date(wkStart);
+    while(wc<=new Date()){wonByWeekMap[`${wc.getMonth()+1}/${wc.getDate()}`]=0;wc.setDate(wc.getDate()+7);}
+    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at).forEach(q=>{
+      const d=new Date(q.won_at);if(d<wkStart)return;
+      const day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);
+      mon.setDate(d.getDate()+diff);mon.setHours(0,0,0,0);
       const k=`${mon.getMonth()+1}/${mon.getDate()}`;
       if(k in wonByWeekMap)wonByWeekMap[k]+=q.total_price||0;
     });
     buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
 
     const aprTotal = aprLive;
-    // Pace: % of last year's total vs % of month elapsed
-    const pctMonthElapsed = today / DAYS_IN_MONTH;
-    const pctOfLastYear = priorMonthVal > 0 ? aprTotal / priorMonthVal : 0;
-    const paceRatio = pctMonthElapsed > 0 ? (pctOfLastYear / pctMonthElapsed) : 0;
-    const pace = priorMonthVal * pctMonthElapsed; // what last year did by this point
-    const barPct = Math.min(100, pctOfLastYear * 100);
+    const pctElapsed=today/DAYS_IN_MONTH;
+    const pctOfLastYr=priorMonthVal>0?aprLive/priorMonthVal:0;
+    const pace=priorMonthVal*pctElapsed;
+    const pctVsLast=pctElapsed>0?((pctOfLastYr/pctElapsed)-1)*100:0;
+    const barPct=Math.min(100,pctOfLastYr*100);
 
-    document.getElementById('m1label').textContent = `${CUR_MONTH_NAME} ${CUR_YEAR} total`;
+    document.getElementById('m1label').textContent=`${CUR_MONTH_NAME} ${CUR_YEAR} total`;
     document.getElementById('m1val').textContent = fmtK(aprTotal);
-    document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live · day ${today}/${DAYS_IN_MONTH} · ${(pctMonthElapsed*100).toFixed(1)}% of month elapsed`;
-    const liveWonByMonth={};
-    allWon.filter(q=>q.won&&q.won_at).forEach(q=>{
-      const d=new Date(q.won_at);
-      const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      liveWonByMonth[k]=(liveWonByMonth[k]||0)+(q.total_price||0);
+    document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live · day ${today}/${DAYS_IN_MONTH} · ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}% vs last ${CUR_MONTH_NAME.slice(0,3)}</span>`;
+    const liveWon={};
+    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at).forEach(q=>{
+      const d=new Date(q.won_at),k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      liveWon[k]=(liveWon[k]||0)+(q.total_price||0);
     });
-    buildWonMonthChart(liveWonByMonth);
+    buildWonMonthChart(liveWon);
     document.getElementById('m2val').textContent = fmtK(aprWon);
     document.getElementById('m2sub').textContent = `${allLive.filter(q=>q.won).length} POs from quoting engine`;
     document.getElementById('m3val').textContent = aprOpen;
     document.getElementById('m3sub').textContent = `${fmtK(aprOpenVal)} open value`;
 
-    const recent = allLive.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,10);
+    const recent=[...allLive].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,10);
     document.getElementById('recentQuotes').innerHTML = recent.length===0
-      ? `<div class="empty-state">No quotes yet this month.</div>`
+      ? `<div class="empty-state">No quotes entered in quoting engine yet today.<br>Enter a quote at quotes.allweldfab.com and it'll appear here.</div>`
       : recent.map(q=>{
           const raw=q.total_price||0, adj=elephantAdj(raw);
           const d=new Date(q.created_at);
           return `<div class="q-row">
-            <span class="q-cust" title="${q.customer_name||''}">${normCust(q.customer_name)||'ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ'}</span>
+            <span class="q-cust" title="${q.customer_name||''}">${normCust(q.customer_name)||'—'}</span>
             <span class="q-amt">${fmt(adj)}${raw>ELEPHANT?`<span class="eleph">50%</span>`:''}</span>
             <span class="q-date">${d.getMonth()+1}/${d.getDate()}</span>
             <span class="q-st ${q.won?'s-won':'s-open'}">${q.won?'won':(q.status||'open')}</span>
           </div>`;
         }).join('');
 
-    document.getElementById('paceTitle').textContent = `${CUR_MONTH_NAME} pace ÃÂÃÂ¢ÃÂÃÂÃÂÃÂ day ${today}/${DAYS_IN_MONTH}`;
+    document.getElementById('paceTitle').textContent = `April pace — day ${today}/${DAYS_IN_MONTH}`;
     document.getElementById('paceContent').innerHTML = `
-  <div style="margin-bottom:14px;">
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:8px;font-family:var(--font);">
-      <span>Quoted so far</span><span>Month elapsed</span><span>Last ${CUR_MONTH_NAME.slice(0,3)} same point</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:14px;font-weight:500;font-family:var(--font);margin-bottom:12px;">
-      <span style="color:#2dd4bf;">${fmtK(aprLive)}</span>
-      <span style="color:var(--text2);">${(pctMonthElapsed*100).toFixed(1)}%</span>
-      <span style="color:var(--text3);">${fmtK(pace)}</span>
-    </div>
-    <div class="bar-bg" style="height:12px;border-radius:4px;position:relative;overflow:visible;">
-      <div style="position:absolute;height:12px;border-radius:4px;background:#185FA5;width:${(pctMonthElapsed*100).toFixed(1)}%;top:0;left:0;opacity:.5;" title="Last year pace"></div>
-      <div style="position:absolute;height:12px;background:#2dd4bf;left:0;width:${Math.min(100,pctOfLastYear*100).toFixed(1)}%;top:0;border-radius:4px;" title="This year"></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:5px;font-family:var(--font);">
-      <span style="color:var(--text3);">blue=last yr pace · teal=this yr</span>
-      <span style="color:var(--text3);">${DAYS_IN_MONTH-today} days left</span>
-    </div>
-  </div>
-  <div style="font-size:11px;color:var(--text2);line-height:1.8;">
-    ${fmtK(aprLive)} quoted = <span style="color:${pctOfLastYear>=pctMonthElapsed?'#4ade80':'#f87171'};font-weight:500;">${(pctOfLastYear*100).toFixed(2)}%</span> of last ${CUR_MONTH_NAME.slice(0,3)}'s ${fmtK(priorMonthVal)} · month is ${(pctMonthElapsed*100).toFixed(1)}% done
-  </div>`
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--font);">
+          <span>Actual</span><span>Pace</span><span>Last ${CUR_MONTH_NAME.slice(0,3)}</span>
+        </div>
+        <div class="bar-bg" style="height:12px;border-radius:4px;position:relative;overflow:visible;">
+          <div style="position:absolute;height:12px;border-radius:4px;background:#185FA5;width:0%;top:0;left:0;opacity:.7;"></div>
+          <div style="position:absolute;height:12px;background:#2dd4bf;left:0%;width:${(Math.min(100,pctOfLastYr*100)).toFixed(1)}%;top:0;border-radius:0 4px 4px 0;"></div>
+          <div style="position:absolute;left:${(today/DAYS_IN_MONTH)*100}%;top:-4px;width:2px;height:20px;background:var(--text3);opacity:.5;border-radius:1px;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:500;margin-top:5px;font-family:var(--font);">
+          <span style="color:#2dd4bf;">${fmtK(aprLive)}</span>
+          <span style="color:var(--text2);">~${fmtK(pace)}</span>
+          <span style="color:var(--text3);">${fmtK(Math.round(pace))}</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8;">
+        <span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}%</span> vs last ${CUR_MONTH_NAME.slice(0,3)} · ${DAYS_IN_MONTH-today} days remaining
+      </div>`;
 
-    document.getElementById('liveWonLine').textContent = `Live ${CUR_MONTH_NAME}: ${fmtK(aprWon)} won from quoting engine`;
+    document.getElementById('liveWonLine').textContent=`Live ${CUR_MONTH_NAME}: ${fmtK(aprWon)} won from quoting engine`;
 
   } catch(e) {
-    document.getElementById('recentQuotes').innerHTML = `<div class="error-msg">Error: ${e.message}</div>`;
+    document.getElementById('recentQuotes').innerHTML = `<div class="error-msg">Connection error: ${e.message}</div>`;
     buildChart(0,[]);
     console.error(e);
   }
