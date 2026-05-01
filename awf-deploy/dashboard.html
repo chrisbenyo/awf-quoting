@@ -413,24 +413,41 @@ async function loadLive() {
         }).join('');
 
     document.getElementById('paceTitle').textContent = `April pace — day ${today}/${DAYS_IN_MONTH}`;
+    // Split-time pace: month + today
+    const todayStart=new Date(CUR_YEAR,CUR_MONTH,today,0,0,0);
+    const quotesToday=allLive.filter(q=>new Date(q.created_at)>=todayStart).reduce((s,q)=>s+elephantAdj(q.total_price||0),0);
+    const priorDailyRate=priorMonthVal/DAYS_IN_MONTH;
+    const todayVsTarget=priorDailyRate>0?quotesToday/priorDailyRate:0;
     document.getElementById('paceContent').innerHTML = `
-      <div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--font);">
-          <span>Actual</span><span>Pace</span><span>Last ${CUR_MONTH_NAME.slice(0,3)}</span>
+      <div style="margin-bottom:14px;">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--font);margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase;">Month to date</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:5px;font-family:var(--font);">
+          <span>${fmtK(aprLive)} quoted</span>
+          <span>${(pctElapsed*100).toFixed(1)}% of month gone</span>
+          <span>Last ${CUR_MONTH_NAME.slice(0,3)}: ${fmtK(priorMonthVal)}</span>
         </div>
-        <div class="bar-bg" style="height:12px;border-radius:4px;position:relative;overflow:visible;">
-          <div style="position:absolute;height:12px;border-radius:4px;background:#185FA5;width:0%;top:0;left:0;opacity:.7;"></div>
-          <div style="position:absolute;height:12px;background:#2dd4bf;left:0%;width:${(Math.min(100,pctOfLastYr*100)).toFixed(1)}%;top:0;border-radius:0 4px 4px 0;"></div>
-          <div style="position:absolute;left:${(today/DAYS_IN_MONTH)*100}%;top:-4px;width:2px;height:20px;background:var(--text3);opacity:.5;border-radius:1px;"></div>
+        <div class="bar-bg" style="height:10px;border-radius:3px;position:relative;overflow:visible;">
+          <div style="position:absolute;height:10px;background:#185FA5;left:0;width:${(pctElapsed*100).toFixed(1)}%;border-radius:3px;opacity:.35;"></div>
+          <div style="position:absolute;height:10px;background:#2dd4bf;left:0;width:${(Math.min(100,pctOfLastYr*100)).toFixed(1)}%;border-radius:3px;"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:500;margin-top:5px;font-family:var(--font);">
-          <span style="color:#2dd4bf;">${fmtK(aprLive)}</span>
-          <span style="color:var(--text2);">~${fmtK(pace)}</span>
-          <span style="color:var(--text3);">${fmtK(Math.round(pace))}</span>
+        <div style="font-size:11px;font-weight:500;margin-top:4px;">
+          <span style="color:${pctVsLast>=0?'#4ade80':'#f87171'};">${pctVsLast>=0?'+':''}${Math.round(pctVsLast)}% vs last ${CUR_MONTH_NAME.slice(0,3)}</span>
+          &nbsp;<span style="color:var(--text3);font-weight:400;">${DAYS_IN_MONTH-today} days left</span>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--text2);line-height:1.8;">
-        <span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}%</span> vs last ${CUR_MONTH_NAME.slice(0,3)} · ${DAYS_IN_MONTH-today} days remaining
+      <div>
+        <div style="font-size:9px;color:var(--text3);font-family:var(--font);margin-bottom:4px;letter-spacing:.06em;text-transform:uppercase;">Today</div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:5px;font-family:var(--font);">
+          <span>${fmtK(quotesToday)} today</span>
+          <span>target: ${fmtK(Math.round(priorDailyRate))}/day</span>
+        </div>
+        <div class="bar-bg" style="height:10px;border-radius:3px;position:relative;">
+          <div style="position:absolute;height:10px;background:#f5a623;left:0;width:${(Math.min(100,todayVsTarget*100)).toFixed(1)}%;border-radius:3px;"></div>
+        </div>
+        <div style="font-size:11px;font-weight:500;margin-top:4px;color:#f5a623;">
+          ${(todayVsTarget*100).toFixed(1)}% of daily target
+          <span style="color:var(--text3);font-weight:400;"> (${fmtK(quotesToday)} of ${fmtK(Math.round(priorDailyRate))})</span>
+        </div>
       </div>`;
 
     document.getElementById('liveWonLine').textContent=`Live ${CUR_MONTH_NAME}: ${fmtK(aprWon)} won from quoting engine`;
