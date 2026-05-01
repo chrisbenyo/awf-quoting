@@ -90,33 +90,33 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <div class="logo-text"><strong>All Weld Fabrication</strong>Quote Dashboard</div>
   </div>
   <div class="topbar-right">
-    <a href="https://quotes.allweldfab.com" class="nav-link">Ã¢ÂÂ Quoting app</a>
-    <a href="https://shopfloor.allweldfab.com" class="nav-link">Ã¢ÂÂ Shop floor</a>
+    <a href="https://quotes.allweldfab.com" class="nav-link">ÃÂ¢ÃÂÃÂ Quoting app</a>
+    <a href="https://shopfloor.allweldfab.com" class="nav-link">ÃÂ¢ÃÂÃÂ Shop floor</a>
     <span class="live-badge"><span class="live-dot"></span>live</span>
-    <button class="refresh-btn" onclick="loadLive()">Ã¢ÂÂ» Refresh</button>
+    <button class="refresh-btn" onclick="loadLive()">ÃÂ¢ÃÂÃÂ» Refresh</button>
   </div>
 </div>
 
 <div class="main">
 
 <div class="seam-note">
-  Ã°ÂÂÂ Historical thru Apr 16 2026 from manual tracker ÃÂ· Live from quoting engine Apr 17+ ÃÂ· Quotes &gt;$100K counted at 50% ÃÂ· Customer names fuzzy-matched
+  ÃÂ°ÃÂÃÂÃÂ Historical thru Apr 16 2026 from manual tracker ÃÂÃÂ· Live from quoting engine Apr 17+ ÃÂÃÂ· Quotes &gt;$100K counted at 50% ÃÂÃÂ· Customer names fuzzy-matched
 </div>
 
 <div class="metric-grid">
-  <div class="metric"><div class="metric-label" id="m1label">Ã¢ÂÂ total</div><div class="metric-value" id="m1val">Ã¢ÂÂ</div><div class="metric-sub" id="m1sub">loading...</div></div>
-  <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="m2val">Ã¢ÂÂ</div><div class="metric-sub" id="m2sub">loading...</div></div>
-  <div class="metric"><div class="metric-label">Open quotes (live)</div><div class="metric-value" id="m3val">Ã¢ÂÂ</div><div class="metric-sub" id="m3sub">loading...</div></div>
+  <div class="metric"><div class="metric-label" id="m1label">ÃÂ¢ÃÂÃÂ total</div><div class="metric-value" id="m1val">ÃÂ¢ÃÂÃÂ</div><div class="metric-sub" id="m1sub">loading...</div></div>
+  <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="m2val">ÃÂ¢ÃÂÃÂ</div><div class="metric-sub" id="m2sub">loading...</div></div>
+  <div class="metric"><div class="metric-label">Open quotes (live)</div><div class="metric-value" id="m3val">ÃÂ¢ÃÂÃÂ</div><div class="metric-sub" id="m3sub">loading...</div></div>
   <div class="metric"><div class="metric-label">All-time avg</div><div class="metric-value">$917K</div><div class="metric-sub">37-month baseline (thru Apr '26)</div></div>
 </div>
 
 <div class="chart-row">
   <div class="card">
-    <div class="card-title">Monthly quote volume Ã¢ÂÂ 24 months</div>
+    <div class="card-title">Monthly quote volume ÃÂ¢ÃÂÃÂ 24 months</div>
     <div class="leg-row">
-      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2025Ã¢ÂÂ26 historical</span>
+      <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2025ÃÂ¢ÃÂÃÂ26 historical</span>
       <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>live (quoting engine)</span>
-      <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2024Ã¢ÂÂ25</span>
+      <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2024ÃÂ¢ÃÂÃÂ25</span>
       <span class="leg"><span class="leg-sq" style="background:#4ade80;border-radius:0;height:2px;width:14px;"></span>avg $936K</span>
     </div>
     <div style="position:relative;height:220px;">
@@ -124,7 +124,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     </div>
   </div>
   <div class="card">
-    <div class="card-title">Recent quotes Ã¢ÂÂ live</div>
+    <div class="card-title">Recent quotes ÃÂ¢ÃÂÃÂ live</div>
     <div id="recentQuotes"><div class="empty-state">Loading...</div></div>
   </div>
 </div>
@@ -133,13 +133,13 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   <div class="win-card" onclick="toggleWin()">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <div class="card-title" style="margin:0;">Overall win rate</div>
-      <span style="font-size:11px;color:var(--text3);" id="winToggle">Ã¢ÂÂ¼ detail</span>
+      <span style="font-size:11px;color:var(--text3);" id="winToggle">ÃÂ¢ÃÂÃÂ¼ detail</span>
     </div>
     <div class="win-big">19.0%</div>
-    <div style="font-size:11px;color:var(--text3);">$5.84M won / $30.7M quoted ÃÂ· all history</div>
+    <div style="font-size:11px;color:var(--text3);">$5.84M won / $30.7M quoted ÃÂÃÂ· all history</div>
     <div style="font-size:11px;color:var(--text3);margin-top:4px;" id="liveWonLine">loading...</div>
     <div class="win-detail" id="winDetail">
-      <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">Historical rates ÃÂ· Jay Enn from Jan 2026 ÃÂ· sorted by rate</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:8px;">Historical rates ÃÂÃÂ· Jay Enn from Jan 2026 ÃÂÃÂ· sorted by rate</div>
       <table class="win-table">
         <thead><tr><th>Customer</th><th>Win %</th><th style="width:60px;">Rate</th><th>Quoted</th></tr></thead>
         <tbody id="winRows"></tbody>
@@ -148,7 +148,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Weekly won Ã¢ÂÂ by won date</div>
+    <div class="card-title">Weekly won ÃÂ¢ÃÂÃÂ by won date</div>
     <div class="leg-row">
       <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>below goal</span>
       <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
@@ -166,7 +166,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title">Won by month Ã¢ÂÂ YoY</div>
+    <div class="card-title">Won by month ÃÂ¢ÃÂÃÂ YoY</div>
     <div class="leg-row">
       <span class="leg"><span class="leg-sq" style="background:#4ade80;"></span>at/above goal</span>
       <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2026 hist</span>
@@ -176,7 +176,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   </div>
 
   <div class="card">
-    <div class="card-title" id="paceTitle">Ã¢ÂÂ pace</div>
+    <div class="card-title" id="paceTitle">ÃÂ¢ÃÂÃÂ pace</div>
     <div id="paceContent"><div class="empty-state">Loading...</div></div>
   </div>
 </div>
@@ -258,7 +258,7 @@ function toggleWin() {
   const d = document.getElementById('winDetail');
   const t = document.getElementById('winToggle');
   d.classList.toggle('open');
-  t.textContent = d.classList.contains('open') ? 'Ã¢ÂÂ² hide' : 'Ã¢ÂÂ¼ detail';
+  t.textContent = d.classList.contains('open') ? 'ÃÂ¢ÃÂÃÂ² hide' : 'ÃÂ¢ÃÂÃÂ¼ detail';
 }
 
 const CUSTS = [
@@ -279,11 +279,11 @@ CUSTS.forEach(c => {
   const bc = !c.r?'#3d4260':c.r>=28?'#4ade80':c.r<12?'#f87171':'#185FA5';
   tr.innerHTML = `<td>${c.n}</td><td>${rs}</td>
     <td><div class="bar-bg"><div class="bar-fill" style="width:${bw}%;background:${bc};"></div></div></td>
-    <td style="color:var(--text3);">${c.q?fmtK(c.q):'Ã¢ÂÂ'}</td>`;
+    <td style="color:var(--text3);">${c.q?fmtK(c.q):'ÃÂ¢ÃÂÃÂ'}</td>`;
   tb.appendChild(tr);
 });
 
-// Weekly won Ã¢ÂÂ spreadsheet through 4/13, live from 4/20+ via won_at
+// Weekly won ÃÂ¢ÃÂÃÂ spreadsheet through 4/13, live from 4/20+ via won_at
 const WKS_HIST = [
   {label:'1/6',v:15539},{label:'1/13',v:9945},{label:'1/19',v:47885},{label:'1/26',v:14003},
   {label:'2/2',v:63616},{label:'2/9',v:16281},{label:'2/16',v:68803},{label:'2/23',v:57215},
@@ -351,7 +351,7 @@ function buildWonMonthChart(liveWonByMonth){
           <div style="flex:1;height:8px;background:var(--surface2);border-radius:2px;position:relative;">
             ${has26?`<div style="position:absolute;left:0;top:0;height:8px;width:${p26}%;background:${c26};border-radius:2px;"></div>`:''}
           </div>
-          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;${has26?'color:var(--text)':'color:var(--text3)'};">${has26?fmtK(v26):'Ã¢ÂÂ'}</span>
+          <span style="width:42px;text-align:right;font-family:var(--font);font-size:10px;${has26?'color:var(--text)':'color:var(--text3)'};">${has26?fmtK(v26):'ÃÂ¢ÃÂÃÂ'}</span>
           ${yoy!==null?`<span style="width:34px;text-align:right;font-size:9px;color:${yc};">${yoy>=0?'+':''}${Math.round(yoy)}%</span>`:'<span style="width:34px;"></span>'}
         </div>
       </div>`;
@@ -416,14 +416,14 @@ async function loadLive() {
 
     const aprTotal = aprLive;
     const pace = aprTotal / (today/DAYS_IN_MONTH);
-    const PRIOR_MONTH_VALS={3:821324,4:583491,5:824355,6:881963,7:1052211,8:1012733,9:863210,10:859272,11:884821,0:1140567,1:1171742,2:1145501};
+    const PRIOR_MONTH_VALS={4:906952,5:889274,6:1367820,7:933525,8:1035669,9:1269595,10:937617,11:1081375,0:1224766,1:1004998,2:869535,3:940111};
     const priorMonthVal=PRIOR_MONTH_VALS[CUR_MONTH]||917456;
     const pctVsLast=((pace-priorMonthVal)/priorMonthVal*100);
     const barPct = Math.min(100,(aprTotal/priorMonthVal)*100);
 
     document.getElementById('m1label').textContent = `${CUR_MONTH_NAME} ${CUR_YEAR} total`;
     document.getElementById('m1val').textContent = fmtK(aprTotal);
-    document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live ÃÂ· day ${today}/${DAYS_IN_MONTH} ÃÂ· ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'Ã¢ÂÂ²':'Ã¢ÂÂ¼'} ${Math.abs(Math.round(pctVsLast))}% vs last ${CUR_MONTH_NAME.slice(0,3)} quotes</span>`;
+    document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live ÃÂÃÂ· day ${today}/${DAYS_IN_MONTH} ÃÂÃÂ· ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'ÃÂ¢ÃÂÃÂ²':'ÃÂ¢ÃÂÃÂ¼'} ${Math.abs(Math.round(pctVsLast))}% vs last ${CUR_MONTH_NAME.slice(0,3)} quotes</span>`;
     const liveWonByMonth={};
     allWon.filter(q=>q.won&&q.won_at).forEach(q=>{
       const d=new Date(q.won_at);
@@ -443,14 +443,14 @@ async function loadLive() {
           const raw=q.total_price||0, adj=elephantAdj(raw);
           const d=new Date(q.created_at);
           return `<div class="q-row">
-            <span class="q-cust" title="${q.customer_name||''}">${normCust(q.customer_name)||'Ã¢ÂÂ'}</span>
+            <span class="q-cust" title="${q.customer_name||''}">${normCust(q.customer_name)||'ÃÂ¢ÃÂÃÂ'}</span>
             <span class="q-amt">${fmt(adj)}${raw>ELEPHANT?`<span class="eleph">50%</span>`:''}</span>
             <span class="q-date">${d.getMonth()+1}/${d.getDate()}</span>
             <span class="q-st ${q.won?'s-won':'s-open'}">${q.won?'won':(q.status||'open')}</span>
           </div>`;
         }).join('');
 
-    document.getElementById('paceTitle').textContent = `${CUR_MONTH_NAME} pace Ã¢ÂÂ day ${today}/${DAYS_IN_MONTH}`;
+    document.getElementById('paceTitle').textContent = `${CUR_MONTH_NAME} pace ÃÂ¢ÃÂÃÂ day ${today}/${DAYS_IN_MONTH}`;
     document.getElementById('paceContent').innerHTML = `
   <div style="margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--font);">
@@ -468,7 +468,7 @@ async function loadLive() {
     </div>
   </div>
   <div style="font-size:11px;color:var(--text2);line-height:1.8;">
-    <span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'Ã¢ÂÂ²':'Ã¢ÂÂ¼'} ${Math.abs(Math.round(pctVsLast))}%</span> vs last ${CUR_MONTH_NAME.slice(0,3)} ÃÂ· ${DAYS_IN_MONTH-today} days remaining
+    <span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'ÃÂ¢ÃÂÃÂ²':'ÃÂ¢ÃÂÃÂ¼'} ${Math.abs(Math.round(pctVsLast))}%</span> vs last ${CUR_MONTH_NAME.slice(0,3)} ÃÂÃÂ· ${DAYS_IN_MONTH-today} days remaining
   </div>`;
 
     document.getElementById('liveWonLine').textContent = `Live ${CUR_MONTH_NAME}: ${fmtK(aprWon)} won from quoting engine`;
