@@ -391,14 +391,14 @@ async function loadLive() {
       const day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);
       mon.setDate(d.getDate()+diff);mon.setHours(0,0,0,0);
       const k=`${mon.getMonth()+1}/${mon.getDate()}`;
-      if(k in wonByWeekMap)wonByWeekMap[k]+=q.total_price||0;
+      if(k in wonByWeekMap)wonByWeekMap[k]+=elephantAdj(q.total_price||0);
     });
     buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
 
     const aprTotal = aprLive;
     const pctElapsed=today/DAYS_IN_MONTH;
     const pctOfLastYr=priorMonthVal>0?aprLive/priorMonthVal:0;
-    const pace=priorMonthVal*pctElapsed;
+    const pace=pctElapsed>0?aprLive/pctElapsed:0;
     const pctVsLast=pctElapsed>0?((pctOfLastYr/pctElapsed)-1)*100:0;
     const barPct=Math.min(100,pctOfLastYr*100);
 
@@ -460,9 +460,9 @@ async function loadLive() {
           <span>target: ${fmtK(Math.round(priorDailyRate))}/day</span>
         </div>
         <div class="bar-bg" style="height:10px;border-radius:3px;position:relative;">
-          <div style="position:absolute;height:10px;background:#f5a623;left:0;width:${(Math.min(100,todayVsTarget*100)).toFixed(1)}%;border-radius:3px;"></div>
+          <div style="position:absolute;height:10px;background:${todayVsTarget>=1?'#4ade80':'#f5a623'};left:0;width:${(Math.min(100,todayVsTarget*100)).toFixed(1)}%;border-radius:3px;"></div>
         </div>
-        <div style="font-size:11px;font-weight:500;margin-top:4px;color:#f5a623;">
+        <div style="font-size:11px;font-weight:500;margin-top:4px;color:${todayVsTarget>=1?'#4ade80':'#f5a623'};">
           ${(todayVsTarget*100).toFixed(1)}% of daily target
           <span style="color:var(--text3);font-weight:400;"> (${fmtK(quotesToday)} of ${fmtK(Math.round(priorDailyRate))})</span>
         </div>
