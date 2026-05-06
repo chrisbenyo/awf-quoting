@@ -411,8 +411,15 @@ async function loadLive() {
       liveWon[k]=(liveWon[k]||0)+(q.total_price||0);
     });
     buildWonMonthChart(liveWon);
-    document.getElementById('m2val').textContent = fmtK(aprWon);
-    document.getElementById('m2sub').textContent = `${allLive.filter(q=>q.won).length} POs from quoting engine`;
+    // Recalculate won this month from allYear using won_at (catches quotes created before month start)
+    const wonThisMonth = (Array.isArray(allYear)?allYear:[]).filter(q=>{
+      if(!q.won_at)return false;
+      const d=new Date(q.won_at);
+      return d.getFullYear()===CUR_YEAR && d.getMonth()===CUR_MONTH;
+    });
+    const aprWonFinal = wonThisMonth.reduce((s,q)=>s+elephantAdj(q.total_price||0),0);
+    document.getElementById('m2val').textContent = fmtK(aprWonFinal);
+    document.getElementById('m2sub').textContent = `${wonThisMonth.length} POs from quoting engine`;
     document.getElementById('m3val').textContent = aprOpen;
     document.getElementById('m3sub').textContent = `${fmtK(aprOpenVal)} open value`;
 
