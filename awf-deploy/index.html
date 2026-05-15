@@ -2289,7 +2289,7 @@ async function generateOrderReport() {
   const hasItems = details.some(d => (d.items && d.items.length > 0) || (d.otherItems && d.otherItems.length > 0));
   if (!hasItems) { toast('No line items found in any detail','err'); return; }
   const reportDate = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
-  const MAX_ROWS = 40;
+  const MAX_ROWS = 28; // ~19px/row × 28 = 532px, fits within body area after header
   let pages = '';
 
   details.forEach((detail, di) => {
@@ -2335,12 +2335,12 @@ async function generateOrderReport() {
       }
 
       const isLastPage = (di === details.length-1) && (ci === chunks.length-1);
-      pages += `<div class="report-page" style="width:11in;height:8.5in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;overflow:hidden;">
+      pages += `<div class="report-page" style="width:11in;min-height:8.5in;height:8.5in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;display:flex;flex-direction:column;">
         <!-- Header -->
         <div style="display:flex;align-items:baseline;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:5px;">
           <div style="flex:1;font-size:18pt;font-weight:bold;">All Welding and Fabricating</div>
           <div style="display:flex;align-items:flex-start;gap:12px;">
-            <div id="qr-${detailNum}-${ci}" style="width:120px;height:120px;"></div>
+            <div id="qr-${detailNum}-${ci}" style="width:96px;height:96px;flex-shrink:0;"></div>
             <div style="text-align:right;"><span style="font-size:14pt;font-weight:bold;">QUOTE &nbsp; Q${q.number}</span><br><span style="font-size:8.5pt;">RFQ: ${q.customer_quote_num||'—'}</span><br><span style="font-size:7pt;color:#666;">PO: ${q.po_number||'TBD'} · Det: ${detailNum}</span></div>
           </div>
         </div>
@@ -2367,7 +2367,7 @@ async function generateOrderReport() {
           </tr>
         </table>
         <!-- Two column body: BOM left 65%, sidebar right 35% -->
-        <div style="display:flex;gap:0;border:1px solid #000;">
+        <div style="display:flex;gap:0;border:1px solid #000;flex:1;min-height:0;">
           <!-- LEFT: BOM table -->
           <div style="width:65%;border-right:1px solid #000;">
             <table style="width:100%;border-collapse:collapse;font-size:8pt;">
@@ -2393,7 +2393,7 @@ async function generateOrderReport() {
               <div>☐ &nbsp;C - Paint Color _______________</div>
             </div>
             <!-- Big open Special Notes / Sketch box -->
-            <div style="border:1px solid #000;flex:1;min-height:3.8in;padding:6px;">
+            <div style="border:1px solid #000;flex:1;padding:6px;">
               <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;">Special Notes / Sketch:</div>
             </div>
             <!-- Operations table -->
@@ -2418,7 +2418,7 @@ async function generateOrderReport() {
   win.document.write('<!DOCTYPE html><html><head><title>Order Report — Q' + q.number + '</title></head><body></body></html>');
   win.document.close();
   const style = win.document.createElement('style');
-  style.textContent = 'body{margin:0;padding:20px;background:#666;}.report-page{margin:0 auto 20px;box-shadow:0 2px 8px rgba(0,0,0,.4);}@media print{@page{size:landscape;margin:0;}body{background:white;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.report-page{box-shadow:none;margin:0;}}';
+  style.textContent = 'body{margin:0;padding:20px;background:#666;}img{max-width:100%;}.report-page{margin:0 auto 20px;box-shadow:0 2px 8px rgba(0,0,0,.4);}@media print{@page{size:landscape;margin:0;}body{background:white;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.report-page{box-shadow:none;margin:0;page-break-after:always;}}';
   win.document.head.appendChild(style);
   // Load QR code library
   const qrScript = win.document.createElement('script');
@@ -2446,7 +2446,7 @@ async function generateOrderReport() {
       if (!el) return;
       const qrData = `AWF|Q${q.number}|PO:${q.po_number||''}|DET:${detailNum}|DUE:${q.due_date||''}`;
       try {
-        new win.QRCode(el, {text: qrData, width: 120, height: 120, correctLevel: win.QRCode.CorrectLevel.L});
+        new win.QRCode(el, {text: qrData, width: 96, height: 96, correctLevel: win.QRCode.CorrectLevel.L});
       } catch(e) { el.title = qrData; }
     });
     setTimeout(()=>win.print(),800);
