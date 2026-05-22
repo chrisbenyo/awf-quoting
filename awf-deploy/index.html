@@ -1059,32 +1059,33 @@ function angleLookup(leg1,leg2,thick){
   return{wt:best[3],poorMatch:bestScore>0.5,matchDesc:`${best[0]}×${best[1]}×${best[2]}"`};
 }
 function calcWeightOnly(item){
-  // Returns weight in lbs for an item regardless of pricing mode
   if(item.type==='flat'){
     const lkp=hrsLookup(item.thickness);
-    const w=lkp?lkp.wtPerSqFt:null;
-    const l=toInches(item.length,item.lengthUnit);
-    const wd=toInches(item.width,item.widthUnit);
-    if(!lkp||w===null||l===null||wd===null) return 0;
-    return(w/144)*wd*l;
+    if(!lkp) return 0;
+    const l=resolveLength(item.length,item.lengthUnit);
+    const wd=resolveLength(item.width,item.widthUnit);
+    if(l===null||wd===null) return 0;
+    return(lkp.wtPerSqFt/144)*wd*l;
   }
   if(item.type==='tube'){
     const tt=item.tubeType||'square';
-    const h=parseFloat(item.dim1),w=tt==='round'?null:parseFloat(item.dim2),wall=parseFloat(item.wall),l=toInches(item.tubeLength,item.tubeLengthUnit||'mm');
+    const h=parseFloat(item.dim1),w=tt==='round'?null:parseFloat(item.dim2),wall=parseFloat(item.wall);
+    const l=resolveLength(item.tubeLength,item.tubeLengthUnit||'mm');
     if(isNaN(h)||isNaN(wall)||l===null) return 0;
     const lookup=tubeLookup(tt,h,w||h,wall);
     if(!lookup) return 0;
     return lookup.wt*(l/12);
   }
   if(item.type==='angle'){
-    const leg1=parseFloat(item.angleLeg1),leg2=parseFloat(item.angleLeg2||item.angleLeg1),thick=parseFloat(item.angleThick),l=toInches(item.angleLength,item.angleLengthUnit||'mm');
+    const leg1=parseFloat(item.angleLeg1),thick=parseFloat(item.angleThick);
+    const l=resolveLength(item.angleLength,item.angleLengthUnit||'mm');
     if(isNaN(leg1)||isNaN(thick)||l===null) return 0;
-    const lookup=angleLookup(leg1,leg2,thick);
+    const lookup=angleLookup(leg1,parseFloat(item.angleLeg2||item.angleLeg1),thick);
     if(!lookup) return 0;
     return lookup.wt*(l/12);
   }
   if(item.type==='cchannel'){
-    const l=toInches(item.cLength,item.cLengthUnit||'mm');
+    const l=resolveLength(item.cLength,item.cLengthUnit||'mm');
     if(l===null) return 0;
     if(item.cUseLbFt&&item.cLbFt) return parseFloat(item.cLbFt)*(l/12);
     const lookup=cChannelLookup(parseFloat(item.cDepth),parseFloat(item.cFlange),parseFloat(item.cWall));
