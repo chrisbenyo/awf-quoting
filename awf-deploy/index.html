@@ -1058,9 +1058,42 @@ function angleLookup(leg1,leg2,thick){
   if(!best) return null;
   return{wt:best[3],poorMatch:bestScore>0.5,matchDesc:`${best[0]}×${best[1]}×${best[2]}"`};
 }
-function priceItem(item){
-  if(item.manualPrice!==''&&item.manualPrice!==null&&!isNaN(parseFloat(item.manualPrice)))
-    return{unitPrice:parseFloat(item.manualPrice),weightLbs:null,flags:['Manual $'],warn:false};
+function calcWeightOnly(item){
+  // Returns weight in lbs for an item regardless of pricing mode
+  if(item.type==='flat'){
+    const lkp=flatLookup(parseFloat(item.thickness));
+    const w=lkp?lkp.wt:null,l=toInches(item.length,item.lengthUnit),wd=toInches(item.width,item.widthUnit);
+    if(!lkp||w===null||l===null||wd===null) return 0;
+    return(w/144)*wd*l;
+  }
+  if(item.type==='tube'){
+    const tt=item.tubeType||'square';
+    const h=parseFloat(item.dim1),w=tt==='round'?null:parseFloat(item.dim2),wall=parseFloat(item.wall),l=toInches(item.tubeLength,item.tubeLengthUnit||'mm');
+    if(isNaN(h)||isNaN(wall)||l===null) return 0;
+    const lookup=tubeLookup(tt,h,w||h,wall);
+    if(!lookup) return 0;
+    return lookup.wt*(l/12);
+  }
+  if(item.type==='angle'){
+    const leg1=parseFloat(item.angleLeg1),leg2=parseFloat(item.angleLeg2||item.angleLeg1),thick=parseFloat(item.angleThick),l=toInches(item.angleLength,item.angleLengthUnit||'mm');
+    if(isNaN(leg1)||isNaN(thick)||l===null) return 0;
+    const lookup=angleLookup(leg1,leg2,thick);
+    if(!lookup) return 0;
+    return lookup.wt*(l/12);
+  }
+  return 0;
+}
+
+function priceItem(item, frozen){
+  // If pricing is frozen (locked quote), use the stored DB price but still show weight
+  if(frozen && item.dbPrice>0 && item.manualPrice==='')
+    return{unitPrice:item.dbPrice, weightLbs:calcWeightOnly(item)||null, flags:['Saved $'], warn:false};
+  if(item.manualPrice!==''&&item.manualPrice!==null&&!isNaN(parseFloat(item.manualPrice))){
+    // Manual price override — still calculate and show weight
+    const weightLbs=calcWeightOnly(item)||null;
+    return{unitPrice:parseFloat(item.manualPrice),weightLbs,flags:['Manual $'],warn:false};
+  }
+  // (manual price now handled above in priceItem with weight preserved)
   if(item.type==='flat'){
     const lkp=hrsLookup(item.thickness);
     const w=resolveLength(item.width,item.widthUnit||'in');
@@ -1373,7 +1406,7 @@ async function openQuote(id){
     } else {
       // Material item
       const idata=row.item_data||{};
-      d.items.push({id:nextLocalId++,dbId:row.id,type:row.item_type,qty:row.qty||1,manualPrice:idata.manualPrice||'',
+      d.items.push({id:nextLocalId++,dbId:row.id,type:row.item_type,qty:row.qty||1,manualPrice:idata.manualPrice||'',dbPrice:row.unit_price||0,
         thickness:idata.thickness||'',width:idata.width||'',length:idata.length||'',lengthUnit:idata.lengthUnit||'in',widthUnit:idata.widthUnit||'in',
         dim1:idata.dim1||'',dim2:idata.dim2||'',wall:idata.wall||'',tubeLength:idata.tubeLength||'',tubeLengthUnit:idata.tubeLengthUnit||'mm',tubeType:idata.tubeType||'square',
         angleLeg1:idata.angleLeg1||'',angleLeg2:idata.angleLeg2||'',angleThick:idata.angleThick||'',angleLength:idata.angleLength||'',angleLengthUnit:idata.angleLengthUnit||'mm',
@@ -1631,10 +1664,13 @@ function renderDetailBody(locked){
   const body=document.getElementById('detail-body');
   if(!body||!details.length) return;
   const d=details[activeDetailIdx];
-  const T=calcDetailTotal(d);
+  // For non-draft/rejected quotes, use stored DB prices instead of live CONFIG rates
+  const q=quotes.find(x=>x.id===currentQuoteId);
+  const priceFrozen = locked && q && q.status!=='draft' && q.status!=='rejected';
+  const T=calcDetailTotal(d, priceFrozen);
 
   const bomRows=d.items.map(item=>{
-    const{unitPrice,weightLbs,flags,warn}=priceItem(item);
+    const{unitPrice,weightLbs,flags,warn}=priceItem(item, priceFrozen);
     const qty=parseInt(item.qty)||1;
     const tt=item.tubeType||'square',isRound=tt==='round';
     const tlu=item.tubeLengthUnit||'mm',lu=item.lengthUnit||'in',wu=item.widthUnit||'in';
@@ -1765,10 +1801,10 @@ function buildTotalsHTML(d,T){
 // ============================================================
 // CALC
 // ============================================================
-function calcDetailTotal(d){
+function calcDetailTotal(d, priceFrozen){
   let matTotal=0,totalWeight=0;
   for(const item of d.items){
-    const{unitPrice,weightLbs}=priceItem(item);
+    const{unitPrice,weightLbs}=priceItem(item, priceFrozen);
     const qty=parseInt(item.qty)||1;
     matTotal+=unitPrice*qty;
     if(weightLbs!==null) totalWeight+=weightLbs*qty;
@@ -1863,7 +1899,7 @@ function removeDetail(idx){
   renderDetailBar(false);renderDetailBody(false);schedSave();
 }
 function addBomItem(type){
-  details[activeDetailIdx].items.push({id:nextLocalId++,type,qty:1,manualPrice:'',thickness:'',width:'',length:'',lengthUnit:'in',widthUnit:'in',dim1:'',dim2:'',wall:'',tubeLength:'',tubeLengthUnit:'mm',tubeType:'square',angleLeg1:'',angleLeg2:'',angleThick:'',angleLength:'',angleLengthUnit:'mm',cDepth:'',cFlange:'',cWall:'',cLength:'',cLengthUnit:'mm',cLbFt:'',cUseLbFt:false});
+  details[activeDetailIdx].items.push({id:nextLocalId++,type,qty:1,manualPrice:'',dbPrice:0,thickness:'',width:'',length:'',lengthUnit:'in',widthUnit:'in',dim1:'',dim2:'',wall:'',tubeLength:'',tubeLengthUnit:'mm',tubeType:'square',angleLeg1:'',angleLeg2:'',angleThick:'',angleLength:'',angleLengthUnit:'mm',cDepth:'',cFlange:'',cWall:'',cLength:'',cLengthUnit:'mm',cLbFt:'',cUseLbFt:false});
   renderDetailBody(false);
   // Save immediately so a refresh never loses a newly added row
   saveItems();
@@ -1941,7 +1977,8 @@ function handleBomChange(e){
       item[field]=el.value;
       if(field==='tubeType'||field==='type'){renderDetailBody(false);schedSave();return;}
       // Auto-detect square vs rect on blur (change event) — safe, not mid-type
-      if((field==='dim1'||field==='dim2')&&item.type==='tube'&&item.tubeType!=='round'){
+      // Skip during tab navigation to avoid destroying DOM and losing focus
+      if((field==='dim1'||field==='dim2')&&item.type==='tube'&&item.tubeType!=='round'&&!_tabbing){
         const d1=parseFloat(item.dim1),d2=parseFloat(item.dim2);
         if(!isNaN(d1)&&!isNaN(d2)&&d2>0){
           const auto=d1===d2?'square':'rect';
@@ -1952,6 +1989,8 @@ function handleBomChange(e){
     }
   }
 }
+let _tabbing = false; // suppress re-render during tab navigation
+
 function handleBomTab(e){
   if(e.key!=='Tab') return;
   const el=e.target,id=el.dataset.id?parseInt(el.dataset.id):null,field=el.dataset.field;
@@ -1964,7 +2003,12 @@ function handleBomTab(e){
     const nextField=e.shiftKey?order[cur-1]:order[cur+1];if(!nextField) return;
     const tr=el.closest('tr');if(!tr) return;
     const next=tr.querySelector(`[data-id="${id}"][data-field="${nextField}"]`);
-    if(next){e.preventDefault();next.focus();}
+    if(next){
+      e.preventDefault();
+      _tabbing=true;
+      next.focus();
+      requestAnimationFrame(()=>{ _tabbing=false; });
+    }
     return;
   }
 }
@@ -2289,7 +2333,7 @@ async function generateOrderReport() {
   const hasItems = details.some(d => (d.items && d.items.length > 0) || (d.otherItems && d.otherItems.length > 0));
   if (!hasItems) { toast('No line items found in any detail','err'); return; }
   const reportDate = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
-  const MAX_ROWS = 40;
+  const MAX_ROWS = 24; // 24 rows × ~19px = ~456px, fits within body after header on 8.5in landscape
   let pages = '';
 
   details.forEach((detail, di) => {
@@ -2329,7 +2373,8 @@ async function generateOrderReport() {
           <td style="border-bottom:1px solid #ddd;padding:3px 4px;"></td>
         </tr>`;
       });
-      const blankRows = Math.min(5, MAX_ROWS - chunkItems.length);
+      const isLastChunk = ci === chunks.length - 1;
+      const blankRows = isLastChunk ? Math.max(0, MAX_ROWS - chunkItems.length) : 0;
       for (let i=0; i<blankRows; i++) {
         rowsHtml += `<tr><td style="border-bottom:1px solid #eee;border-right:1px solid #000;height:19px;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;"></td></tr>`;
       }
