@@ -1061,8 +1061,10 @@ function angleLookup(leg1,leg2,thick){
 function calcWeightOnly(item){
   // Returns weight in lbs for an item regardless of pricing mode
   if(item.type==='flat'){
-    const lkp=flatLookup(parseFloat(item.thickness));
-    const w=lkp?lkp.wt:null,l=toInches(item.length,item.lengthUnit),wd=toInches(item.width,item.widthUnit);
+    const lkp=hrsLookup(item.thickness);
+    const w=lkp?lkp.wtPerSqFt:null;
+    const l=toInches(item.length,item.lengthUnit);
+    const wd=toInches(item.width,item.widthUnit);
     if(!lkp||w===null||l===null||wd===null) return 0;
     return(w/144)*wd*l;
   }
@@ -1078,6 +1080,14 @@ function calcWeightOnly(item){
     const leg1=parseFloat(item.angleLeg1),leg2=parseFloat(item.angleLeg2||item.angleLeg1),thick=parseFloat(item.angleThick),l=toInches(item.angleLength,item.angleLengthUnit||'mm');
     if(isNaN(leg1)||isNaN(thick)||l===null) return 0;
     const lookup=angleLookup(leg1,leg2,thick);
+    if(!lookup) return 0;
+    return lookup.wt*(l/12);
+  }
+  if(item.type==='cchannel'){
+    const l=toInches(item.cLength,item.cLengthUnit||'mm');
+    if(l===null) return 0;
+    if(item.cUseLbFt&&item.cLbFt) return parseFloat(item.cLbFt)*(l/12);
+    const lookup=cChannelLookup(parseFloat(item.cDepth),parseFloat(item.cFlange),parseFloat(item.cWall));
     if(!lookup) return 0;
     return lookup.wt*(l/12);
   }
