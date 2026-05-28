@@ -2344,7 +2344,7 @@ async function generateOrderReport() {
   const hasItems = details.some(d => (d.items && d.items.length > 0) || (d.otherItems && d.otherItems.length > 0));
   if (!hasItems) { toast('No line items found in any detail','err'); return; }
   const reportDate = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
-  const MAX_ROWS = 24; // 24 rows × ~19px = ~456px, fits within body after header on 8.5in landscape
+  const MAX_ROWS = 30; // 30 rows × ~19px = ~570px, fits within ~660px usable body on 8.5in landscape
   let pages = '';
 
   details.forEach((detail, di) => {
@@ -2385,7 +2385,16 @@ async function generateOrderReport() {
         </tr>`;
       });
       const isLastChunk = ci === chunks.length - 1;
-      const blankRows = isLastChunk ? Math.max(0, MAX_ROWS - chunkItems.length) : 0;
+      // Padding strategy:
+      //   - Multi-chunk report's last page: pad to MAX_ROWS so all pages look uniform
+      //   - Single-page report: just 5 blank write-in rows, let the sidebar's min-height drive page size
+      //   - Non-last chunks: already full, no padding
+      let blankRows = 0;
+      if (isLastChunk && chunks.length > 1) {
+        blankRows = Math.max(0, MAX_ROWS - chunkItems.length);
+      } else if (isLastChunk) {
+        blankRows = Math.min(5, MAX_ROWS - chunkItems.length);
+      }
       for (let i=0; i<blankRows; i++) {
         rowsHtml += `<tr><td style="border-bottom:1px solid #eee;border-right:1px solid #000;height:19px;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;border-right:1px solid #000;"></td><td style="border-bottom:1px solid #eee;"></td></tr>`;
       }
