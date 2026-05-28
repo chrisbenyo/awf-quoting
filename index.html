@@ -2400,7 +2400,7 @@ async function generateOrderReport() {
       }
 
       const isLastPage = (di === details.length-1) && (ci === chunks.length-1);
-      pages += `<div class="report-page" style="width:11in;height:8.5in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;overflow:hidden;">
+      pages += `<div class="report-page" style="width:11in;height:8.4in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;overflow:hidden;">
         <!-- Header -->
         <div style="display:flex;align-items:baseline;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:5px;">
           <div style="flex:1;font-size:18pt;font-weight:bold;">All Welding and Fabricating</div>
@@ -2483,7 +2483,7 @@ async function generateOrderReport() {
   win.document.write('<!DOCTYPE html><html><head><title>Order Report — Q' + q.number + '</title></head><body></body></html>');
   win.document.close();
   const style = win.document.createElement('style');
-  style.textContent = 'body{margin:0;padding:20px;background:#666;}.report-page{margin:0 auto 20px;box-shadow:0 2px 8px rgba(0,0,0,.4);}@media print{@page{size:landscape;margin:0;}body{background:white;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.report-page{box-shadow:none;margin:0;}}';
+  style.textContent = 'body{margin:0;padding:20px;background:#666;}.report-page{margin:0 auto 20px;box-shadow:0 2px 8px rgba(0,0,0,.4);}@media print{@page{size:landscape;margin:0;}html,body{background:white;padding:0;margin:0;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;}.report-page{box-shadow:none;margin:0;}.report-page:last-child{page-break-after:avoid!important;break-after:avoid!important;}}';
   win.document.head.appendChild(style);
   // Load QR code library
   const qrScript = win.document.createElement('script');
