@@ -157,10 +157,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <div id="weeklyRows"></div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;font-family:var(--font);">
-        <span style="color:var(--text3);">13-wk avg</span><span>$37,324</span>
+        <span style="color:var(--text3);">YTD weekly avg</span><span id="ytdWeeklyAvg">--</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:11px;font-family:var(--font);">
-        <span style="color:var(--text3);">YTD won thru Apr 16</span><span>$569K</span>
+        <span style="color:var(--text3);" id="ytdWonLabel">YTD won</span><span id="ytdWonVal">--</span>
       </div>
     </div>
   </div>
@@ -393,7 +393,21 @@ async function loadLive() {
       const k=`${mon.getMonth()+1}/${mon.getDate()}`;
       if(k in wonByWeekMap)wonByWeekMap[k]+=elephantAdj(q.total_price||0);
     });
-    buildWeeklyChart([...WKS_HIST,...Object.entries(wonByWeekMap).map(([label,v])=>({label,v}))]);
+    const liveWeeks = Object.entries(wonByWeekMap).map(([label,v])=>({label,v}));
+    buildWeeklyChart([...WKS_HIST,...liveWeeks]);
+
+    // ── YTD won total = manual tracker (Jan-Mar) + live won_at sum (Apr 20+)
+    // ── YTD weekly avg = total ÷ number of weekly buckets shown in chart
+    const histTotal = WKS_HIST.reduce((s,w)=>s+w.v,0);
+    const liveTotal = liveWeeks.reduce((s,w)=>s+w.v,0);
+    const ytdWon = histTotal + liveTotal;
+    const weekCount = WKS_HIST.length + liveWeeks.length;
+    const ytdWeeklyAvg = weekCount > 0 ? ytdWon / weekCount : 0;
+    document.getElementById('ytdWonVal').textContent = fmtK(ytdWon);
+    document.getElementById('ytdWeeklyAvg').textContent = fmt(ytdWeeklyAvg);
+    // Latest week shown gives the "thru" date label
+    const lastWkLabel = liveWeeks.length ? liveWeeks[liveWeeks.length-1].label : WKS_HIST[WKS_HIST.length-1].label;
+    document.getElementById('ytdWonLabel').textContent = `YTD won thru wk of ${lastWkLabel}`;
 
     const aprTotal = aprLive;
     const pctElapsed=today/DAYS_IN_MONTH;
