@@ -44,7 +44,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
 
 .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
 table.report{width:100%;border-collapse:collapse;font-size:12.5px;}
-table.report th{background:var(--surface2);color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:10px;padding:10px 12px;text-align:right;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);font-family:var(--font);position:sticky;top:46px;z-index:50;}
+table.report th{background:var(--surface2);color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:10px;padding:10px 12px;text-align:right;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);font-family:var(--font);}
 table.report th:hover{color:var(--amber);}
 table.report th.sort-asc::after{content:' ▲';color:var(--amber);font-size:9px;}
 table.report th.sort-desc::after{content:' ▼';color:var(--amber);font-size:9px;}
@@ -393,6 +393,10 @@ document.querySelectorAll('table.report th').forEach(th => {
       currentSort.dir = key === 'display' ? 'asc' : 'desc';
     }
     renderTable();
+    // Scroll page back to the table header so the user sees the new top row.
+    // Without this, re-sorting silently rearranges rows under the user's current scroll position,
+    // making it look like specific customers "disappeared" when they actually moved to row #1.
+    document.getElementById('report-table')?.scrollIntoView({behavior:'smooth', block:'start'});
   });
 });
 
