@@ -1353,7 +1353,8 @@ function _custNormalize(s){
 function _buildCustomerIndex(){
   // Map of normalized → {display: longest variant, count: occurrences}
   const map = new Map();
-  (window.quotes||[]).forEach(q => {
+  // `quotes` is the module-scope array populated by loadQuotes()
+  (typeof quotes !== 'undefined' ? quotes : []).forEach(q => {
     const raw = (q.customer_name||'').trim();
     if(!raw) return;
     const norm = _custNormalize(raw);
@@ -1662,7 +1663,7 @@ function renderQuoteEditor(q){
     </div>
     ${banner}
     <div class="cbar">
-      <span class="cust-ac-wrap"><input id="field-customer" placeholder="Customer / Company" value="${esc(q.customer_name||'')}" oninput="schedSave()" autocomplete="off" ${locked?'readonly':''}><div class="cust-ac-dropdown" id="field-customer-ac"></div></span>${locked?'':'<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openOdooModal()">⬇ Odoo</button>'}
+      <div class="cust-ac-wrap"><input id="field-customer" placeholder="Customer / Company" value="${esc(q.customer_name||'')}" oninput="schedSave()" autocomplete="off" ${locked?'readonly':''}><div class="cust-ac-dropdown" id="field-customer-ac"></div></div>${locked?'':'<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openOdooModal()">⬇ Odoo</button>'}
       <span class="cbar-sep">|</span>
       <input id="field-cust-quote" placeholder="Customer Quote #" value="${esc(q.customer_quote_num||'')}" oninput="schedSave()" ${locked?'readonly':''} style="max-width:150px">
       <span class="cbar-sep">|</span>
