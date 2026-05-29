@@ -406,6 +406,7 @@ table.bom select option{background:var(--surface2);}
     <div class="topbar-right">
       <span class="save-status" id="save-status"></span>
       <button class="btn btn-ghost btn-sm" id="shop-nav-btn" onclick="openShopScreen()" style="display:none;border-color:var(--teal);color:var(--teal);">🏭 Shop</button>
+      <a class="btn btn-ghost btn-sm" href="customers.html" style="text-decoration:none;display:inline-flex;align-items:center;">📊 Customers</a>
       <button class="btn btn-ghost btn-sm" onclick="openPricingDash()">⚙ Pricing</button>
       <button class="btn btn-ghost btn-sm" onclick="showChangePassword()">Password</button>
       <button class="btn btn-ghost btn-sm" onclick="signOut()">Sign out</button>
@@ -1281,8 +1282,25 @@ function showApp(){
   rb.className='role-badge role-'+(currentProfile?.role||'estimator');
   if(currentProfile?.role==='admin') document.getElementById('filter-tabs').style.display='flex';
   if(currentProfile?.role==='admin') document.getElementById('shop-nav-btn').style.display='inline-flex';
-  loadQuotes();
+  loadQuotes().then(_applyCustomerFilterFromUrl);
   // Keepalive removed — sessionStorage handles per-tab sessions cleanly
+}
+
+// If the page was loaded with ?customer=Name, pre-fill the sidebar search so the user
+// sees only that customer's quotes. Called once after the initial loadQuotes() resolves.
+function _applyCustomerFilterFromUrl(){
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const name = p.get('customer');
+    if(!name) return;
+    const el = document.getElementById('sidebar-search');
+    if(!el) return;
+    el.value = name;
+    renderSidebar();
+    // Remove the param from the URL so refresh doesn't keep filtering
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState(null,'',cleanUrl);
+  } catch(e){ /* non-fatal */ }
 }
 function toggleAuthMode(){
   authMode=authMode==='signin'?'signup':'signin';
