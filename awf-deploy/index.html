@@ -352,6 +352,17 @@ table.bom select option{background:var(--surface2);}
 .kol-card-due{font-family:var(--font);font-size:10px;display:inline-block;margin-top:4px;padding:1px 6px;border-radius:3px;border:1px solid var(--border);}
 .kol-card-due.overdue{border-color:var(--red);color:var(--red);}
 .kol-card-due.soon{border-color:var(--warn);color:var(--warn);}
+
+/* ── CUSTOMER AUTOCOMPLETE ── */
+.cust-ac-wrap{position:relative;display:inline-flex;flex:1;min-width:80px;}
+.cbar .cust-ac-wrap{flex:1;min-width:80px;}
+.cust-ac-wrap input{width:100%;}
+.cust-ac-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-top:none;border-radius:0 0 var(--radius) var(--radius);max-height:240px;overflow-y:auto;z-index:1000;display:none;box-shadow:0 4px 12px rgba(0,0,0,.35);}
+.cust-ac-dropdown.open{display:block;}
+.cust-ac-item{padding:8px 12px;font-size:13px;color:var(--text);cursor:pointer;border-bottom:1px solid var(--border);font-family:var(--sans);}
+.cust-ac-item:last-child{border-bottom:none;}
+.cust-ac-item:hover,.cust-ac-item.active{background:var(--surface2);color:var(--amber);}
+.cust-ac-item .ac-count{float:right;font-size:11px;color:var(--text3);font-family:var(--font);}
 </style>
 </head>
 <body>
@@ -634,8 +645,11 @@ table.bom select option{background:var(--surface2);}
       <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">Creates a new draft with all details copied. Change the customer name below.</div>
       <div class="lfield">
         <label>New Customer Name</label>
-        <input type="text" id="dup-customer" placeholder="Customer / Company"
-          style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--sans);">
+        <div class="cust-ac-wrap" style="display:block;">
+          <input type="text" id="dup-customer" placeholder="Customer / Company" autocomplete="off"
+            style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px;color:var(--text);font-size:14px;font-family:var(--sans);">
+          <div class="cust-ac-dropdown" id="dup-customer-ac"></div>
+        </div>
       </div>
       <div id="dup-err" style="color:var(--red);font-size:12px;min-height:16px;margin-top:2px;"></div>
     </div>
@@ -1325,6 +1339,100 @@ async function signOut(){
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('login-screen').classList.contains('show')) doAuth();});
 
 // ============================================================
+// CUSTOMER AUTOCOMPLETE — suggest existing customer names as user types
+// ============================================================
+// Builds an in-memory index from the global `quotes` array (already loaded by loadQuotes).
+// Match logic: case-insensitive starts-with on a normalized version of each customer name.
+// Triggers after 2 characters typed. Shows up to 8 suggestions. Picks the longest variant
+// as the displayed name for each normalized group, so "Acme Corp." beats "Acme" in display
+// but both match a search for "acme".
+function _custNormalize(s){
+  return (s||'').toLowerCase().replace(/[.,;:'"()&\-_/\\]/g,' ').replace(/\s+/g,' ').trim()
+    .replace(/\b(inc|incorporated|llc|l\.l\.c\.|corp|corporation|co|company|ltd|limited|pllc|pc)\b/g,'').trim();
+}
+function _buildCustomerIndex(){
+  // Map of normalized → {display: longest variant, count: occurrences}
+  const map = new Map();
+  (window.quotes||[]).forEach(q => {
+    const raw = (q.customer_name||'').trim();
+    if(!raw) return;
+    const norm = _custNormalize(raw);
+    if(!norm) return;
+    const ex = map.get(norm);
+    if(!ex){ map.set(norm, {display: raw, count: 1}); }
+    else { ex.count++; if(raw.length > ex.display.length) ex.display = raw; }
+  });
+  // Sort by usage count desc so most-used variants surface first
+  return [...map.values()].sort((a,b) => b.count - a.count);
+}
+function _custSuggestions(query){
+  if(!query || query.length < 2) return [];
+  const qNorm = _custNormalize(query);
+  const qLow = query.toLowerCase();
+  const all = _buildCustomerIndex();
+  // Match if the normalized display starts with the normalized query,
+  // OR if the lowercased display starts with the lowercased query (catches "T" matches "Tri-")
+  return all.filter(c => {
+    const dispLow = c.display.toLowerCase();
+    const dispNorm = _custNormalize(c.display);
+    return dispLow.startsWith(qLow) || dispNorm.startsWith(qNorm);
+  }).slice(0, 8);
+}
+function attachCustomerAutocomplete(inputEl, dropdownEl){
+  if(!inputEl || !dropdownEl) return;
+  if(inputEl._acAttached) return; // idempotent
+  inputEl._acAttached = true;
+  let activeIdx = -1;
+  let suggestions = [];
+  function render(){
+    if(!suggestions.length){ dropdownEl.classList.remove('open'); dropdownEl.innerHTML=''; activeIdx=-1; return; }
+    dropdownEl.innerHTML = suggestions.map((c,i) =>
+      `<div class="cust-ac-item${i===activeIdx?' active':''}" data-idx="${i}">${c.display.replace(/</g,'&lt;')}<span class="ac-count">${c.count}</span></div>`
+    ).join('');
+    dropdownEl.classList.add('open');
+  }
+  function pick(idx){
+    if(idx < 0 || idx >= suggestions.length) return;
+    inputEl.value = suggestions[idx].display;
+    suggestions = []; render();
+    // Fire input event so any oninput handler (schedSave) runs
+    inputEl.dispatchEvent(new Event('input', {bubbles:true}));
+  }
+  inputEl.addEventListener('input', () => {
+    suggestions = _custSuggestions(inputEl.value);
+    activeIdx = -1;
+    render();
+  });
+  inputEl.addEventListener('keydown', e => {
+    if(!dropdownEl.classList.contains('open')) return;
+    if(e.key === 'ArrowDown'){ e.preventDefault(); activeIdx = Math.min(activeIdx+1, suggestions.length-1); render(); }
+    else if(e.key === 'ArrowUp'){ e.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); render(); }
+    else if(e.key === 'Enter' && activeIdx >= 0){ e.preventDefault(); pick(activeIdx); }
+    else if(e.key === 'Escape'){ suggestions = []; render(); }
+    else if(e.key === 'Tab' && activeIdx >= 0){ pick(activeIdx); /* allow tab to also move focus */ }
+  });
+  inputEl.addEventListener('blur', () => {
+    // Delay so click on a suggestion item can fire first
+    setTimeout(() => { suggestions = []; render(); }, 150);
+  });
+  dropdownEl.addEventListener('mousedown', e => {
+    const item = e.target.closest('.cust-ac-item');
+    if(item){ e.preventDefault(); pick(parseInt(item.dataset.idx)); }
+  });
+}
+// Hook called after renderQuoteEditor and after dup modal opens
+function _wireCustomerAutocomplete(){
+  attachCustomerAutocomplete(
+    document.getElementById('field-customer'),
+    document.getElementById('field-customer-ac')
+  );
+  attachCustomerAutocomplete(
+    document.getElementById('dup-customer'),
+    document.getElementById('dup-customer-ac')
+  );
+}
+
+// ============================================================
 // QUOTES — LOAD / SIDEBAR
 // ============================================================
 let currentSortOrder='updated_at.desc';
@@ -1454,6 +1562,7 @@ function openDupModal(){
   setTimeout(()=>{
     const el=document.getElementById('dup-customer');
     el.focus();el.select();
+    _wireCustomerAutocomplete();
   },80);
 }
 function closeDupModal(){
@@ -1553,7 +1662,7 @@ function renderQuoteEditor(q){
     </div>
     ${banner}
     <div class="cbar">
-      <input id="field-customer" placeholder="Customer / Company" value="${esc(q.customer_name||'')}" oninput="schedSave()" ${locked?'readonly':''}>${locked?'':'<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openOdooModal()">⬇ Odoo</button>'}
+      <span class="cust-ac-wrap"><input id="field-customer" placeholder="Customer / Company" value="${esc(q.customer_name||'')}" oninput="schedSave()" autocomplete="off" ${locked?'readonly':''}><div class="cust-ac-dropdown" id="field-customer-ac"></div></span>${locked?'':'<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;flex-shrink:0" onclick="openOdooModal()">⬇ Odoo</button>'}
       <span class="cbar-sep">|</span>
       <input id="field-cust-quote" placeholder="Customer Quote #" value="${esc(q.customer_quote_num||'')}" oninput="schedSave()" ${locked?'readonly':''} style="max-width:150px">
       <span class="cbar-sep">|</span>
@@ -1655,6 +1764,9 @@ function renderQuoteEditor(q){
   document.getElementById('quote-editor').addEventListener('change',handleBomChange);
   document.getElementById('quote-editor').addEventListener('blur',handleBomChange,true);
   document.getElementById('quote-editor').addEventListener('keydown',handleBomTab);
+
+  // Customer name autocomplete on #field-customer
+  _wireCustomerAutocomplete();
 }
 
 // ============================================================
