@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWF — Job Status Report</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* ============================================================
+   Light theme designed for customer-facing & print
+   ============================================================ */
+:root {
+  --paper:#ffffff;
+  --ink:#1a1a1a;
+  --ink-dim:#4a4a4a;
+  --ink-light:#7a7a7a;
+  --border:#d4d4d4;
+  --border-dim:#e8e8e8;
+  --awf-amber:#b8740e;
+  --bg-section:#f7f7f5;
+  --bg-tile:#fafaf8;
+  --status-dispatched-bg:#eeeeee; --status-dispatched-fg:#555555;
+  --status-progress-bg:#fff4e0;   --status-progress-fg:#a05a00;
+  --status-completed-bg:#e7f1fc;  --status-completed-fg:#1e5a9e;
+  --status-shipped-bg:#e3f5e3;    --status-shipped-fg:#1f6f3a;
+  --sans:'DM Sans',system-ui,sans-serif;
+  --radius:4px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{background:var(--bg-section);color:var(--ink);font-family:var(--sans);font-size:13px;line-height:1.45;}
+
+/* ============================================================
+   Screen-only control bar (hidden on print)
+   ============================================================ */
+.controlbar{
+  position:sticky;top:0;z-index:100;background:#1a1d27;color:#e8e9f0;
+  display:flex;align-items:center;gap:12px;padding:10px 18px;font-size:12px;
+  border-bottom:1px solid #2e3248;
+}
+.controlbar .brand{color:#f5a623;font-weight:600;letter-spacing:.05em;}
+.controlbar .sep{width:1px;height:16px;background:#3d4260;}
+.controlbar .meta{color:#9aa0b8;}
+.controlbar .right{margin-left:auto;display:flex;gap:8px;}
+.controlbar a, .controlbar button {
+  background:transparent;color:#e8e9f0;border:1px solid #3d4260;border-radius:4px;
+  padding:6px 12px;font-size:12px;font-family:var(--sans);cursor:pointer;text-decoration:none;
+}
+.controlbar button.primary{background:#f5a623;color:#1a1d27;border-color:#f5a623;font-weight:600;}
+.controlbar a:hover, .controlbar button:hover{border-color:#5a5d72;}
+.controlbar button.primary:hover{background:#ffb733;border-color:#ffb733;}
+
+/* ============================================================
+   Paper / page
+   ============================================================ */
+.paper{
+  max-width:8.5in;margin:24px auto;background:var(--paper);color:var(--ink);
+  padding:0.6in 0.6in 0.6in 0.6in;
+  box-shadow:0 2px 12px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   Letterhead
+   ============================================================ */
+.letterhead{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  border-bottom:3px solid var(--awf-amber);padding-bottom:14px;margin-bottom:24px;
+}
+.letterhead .left .company{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:0;}
+.letterhead .left .tagline{font-size:11px;color:var(--ink-light);margin-top:2px;letter-spacing:.05em;text-transform:uppercase;}
+.letterhead .right{text-align:right;font-size:11px;color:var(--ink-dim);}
+.letterhead .right .doc-title{font-size:14px;font-weight:600;color:var(--awf-amber);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px;}
+
+/* Customer / "Prepared for" block */
+.prepared-for{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+.prepared-for .label{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-light);margin-bottom:4px;}
+.prepared-for .customer{font-size:22px;font-weight:600;color:var(--ink);}
+.prepared-for .gen-stamp{font-size:11px;color:var(--ink-light);text-align:right;}
+
+/* ============================================================
+   Summary tiles
+   ============================================================ */
+.summary{display:flex;gap:10px;margin-bottom:22px;}
+.tile{
+  flex:1;background:var(--bg-tile);border:1px solid var(--border-dim);
+  border-radius:var(--radius);padding:10px 14px;
+}
+.tile .label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-light);margin-bottom:3px;}
+.tile .val{font-size:20px;font-weight:700;color:var(--ink);line-height:1.1;}
+.tile .sub{font-size:10px;color:var(--ink-light);margin-top:1px;}
+
+/* ============================================================
+   PO blocks
+   ============================================================ */
+.po-block{margin-bottom:16px;page-break-inside:avoid;break-inside:avoid;}
+.po-header{
+  background:var(--bg-section);border:1px solid var(--border-dim);border-bottom:none;
+  border-radius:var(--radius) var(--radius) 0 0;padding:8px 12px;
+  display:flex;align-items:center;gap:14px;
+}
+.po-header .ponum{font-weight:700;font-size:13px;color:var(--ink);letter-spacing:.02em;}
+.po-header .ponum::before{content:'PO ';color:var(--ink-light);font-weight:500;}
+.po-header .label-meta{font-size:11px;color:var(--ink-dim);}
+.po-header .due{margin-left:auto;font-size:11px;color:var(--ink-dim);}
+.po-header .due strong{color:var(--ink);font-weight:600;}
+
+table.details{
+  width:100%;border-collapse:collapse;background:var(--paper);
+  border:1px solid var(--border-dim);border-radius:0 0 var(--radius) var(--radius);overflow:hidden;
+  font-size:12px;
+}
+table.details th{
+  background:var(--bg-section);color:var(--ink-light);font-weight:600;font-size:9.5px;
+  letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:7px 10px;
+  border-bottom:1px solid var(--border-dim);
+}
+table.details td{padding:9px 10px;border-bottom:1px solid var(--border-dim);vertical-align:top;}
+table.details tr:last-child td{border-bottom:none;}
+table.details .col-det{width:60px;font-weight:600;color:var(--ink);}
+table.details .col-qty{width:60px;text-align:right;color:var(--ink-dim);}
+table.details .col-desc{color:var(--ink);}
+table.details .col-status{width:155px;}
+table.details .col-activity{width:140px;color:var(--ink-light);font-size:11px;}
+
+/* Status pills */
+.badge{
+  display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;
+  letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;
+}
+.badge.dispatched{background:var(--status-dispatched-bg);color:var(--status-dispatched-fg);}
+.badge.progress{background:var(--status-progress-bg);color:var(--status-progress-fg);}
+.badge.completed{background:var(--status-completed-bg);color:var(--status-completed-fg);}
+.badge.shipped{background:var(--status-shipped-bg);color:var(--status-shipped-fg);}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.report-footer{
+  margin-top:28px;padding-top:14px;border-top:1px solid var(--border-dim);
+  font-size:10px;color:var(--ink-light);display:flex;justify-content:space-between;
+}
+
+/* Empty state */
+.empty{text-align:center;padding:48px 16px;color:var(--ink-light);font-size:13px;background:var(--bg-tile);border-radius:var(--radius);}
+
+/* Error banner */
+.err{background:#fff4f4;border:1px solid #f5b5b5;color:#9b3030;padding:12px 16px;border-radius:var(--radius);margin-bottom:16px;font-size:13px;}
+
+/* Loader */
+#loader{
+  position:fixed;inset:0;background:var(--bg-section);display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:200;
+}
+.spinner{
+  width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--awf-amber);
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ============================================================
+   PRINT styles
+   ============================================================ */
+@media print {
+  @page { size: letter; margin: 0.5in; }
+  html, body { background: white !important; }
+  .controlbar { display: none !important; }
+  .paper {
+    max-width: none; margin: 0; padding: 0;
+    box-shadow: none; background: white;
+  }
+  .po-block { page-break-inside: avoid; break-inside: avoid; }
+  .summary { page-break-inside: avoid; break-inside: avoid; }
+  .tile, table.details, .po-header { border-color: #888 !important; }
+  table.details, .po-header { background: white !important; }
+  .tile { background: white !important; }
+  .badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .report-footer { position: running(footer); }
+}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div style="font-weight:700;color:var(--awf-amber);font-size:18px;letter-spacing:.04em;">AWF</div>
+  <div class="spinner"></div>
+  <div style="font-size:11px;color:var(--ink-light);">Loading status report…</div>
+</div>
+
+<div class="controlbar">
+  <span class="brand">AWF</span>
+  <span class="sep"></span>
+  <span class="meta">Job Status Report</span>
+  <div class="right">
+    <a href="customers.html">← Customers</a>
+    <a href="index.html">Quotes</a>
+    <button class="primary" onclick="window.print()">🖨 Print / Save as PDF</button>
+  </div>
+</div>
+
+<div class="paper" id="paper" style="display:none;">
+
+  <div class="letterhead">
+    <div class="left">
+      <div class="company">All Welding &amp; Fabricating</div>
+      <div class="tagline">Custom Steel Fabrication · Troy, MI</div>
+    </div>
+    <div class="right">
+      <div class="doc-title">Job Status Report</div>
+      <div id="gen-date">—</div>
+    </div>
+  </div>
+
+  <div class="prepared-for">
+    <div>
+      <div class="label">Prepared for</div>
+      <div class="customer" id="customer-name">—</div>
+    </div>
+    <div class="gen-stamp" id="gen-stamp">—</div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div id="err-area"></div>
+
+  <div id="po-list"></div>
+
+  <div class="report-footer">
+    <div>All Welding &amp; Fabricating · Troy, MI</div>
+    <div id="footer-date">—</div>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// Auth — matches index.html (key 'awf_token', fields access/refresh/expiry in ms)
+// ============================================================
+const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+
+let _authToken = null, _refreshToken = null, _tokenExpiry = null;
+
+function saveTokens(access, refresh, expiresIn) {
+  _authToken = access; _refreshToken = refresh; _tokenExpiry = Date.now() + (expiresIn * 1000);
+  try { localStorage.setItem('awf_token', JSON.stringify({access, refresh, expiry: _tokenExpiry})); } catch(e) {}
+}
+function loadTokens() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('awf_token') || 'null');
+    if (stored && stored.expiry > Date.now()) {
+      _authToken = stored.access; _refreshToken = stored.refresh; _tokenExpiry = stored.expiry;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+async function refreshSession() {
+  if (!_refreshToken) return false;
+  try {
+    const data = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST', headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+      body: JSON.stringify({refresh_token: _refreshToken})
+    }).then(r => r.json());
+    if (data.access_token) { saveTokens(data.access_token, data.refresh_token, data.expires_in); return true; }
+  } catch(e) {}
+  return false;
+}
+async function sbFetch(path, options={}){
+  if (_authToken && _tokenExpiry && _tokenExpiry - Date.now() < 300000) await refreshSession();
+  const headers = {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json', ...options.headers};
+  if(_authToken) headers['Authorization'] = 'Bearer ' + _authToken;
+  const res = await fetch(SUPABASE_URL + path, {...options, headers});
+  if(!res.ok){
+    const err = await res.json().catch(() => ({message:res.statusText}));
+    throw new Error(err.message || res.statusText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+// ============================================================
+// Customer-name normalization — must match customers.html and index.html
+// ============================================================
+function _custNormalize(s){
+  return (s||'').toLowerCase().replace(/[.,;:'"()&\-_/\\]/g,' ').replace(/\s+/g,' ').trim()
+    .replace(/\b(inc|incorporated|llc|l\.l\.c\.|corp|corporation|co|company|ltd|limited|pllc|pc)\b/g,'').trim();
+}
+
+// ============================================================
+// Format helpers
+// ============================================================
+function fmtDate(d){
+  if(!d) return '—';
+  const dt = typeof d === 'string' ? new Date(d) : d;
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+function fmtDateShort(d){
+  if(!d) return '—';
+  const dt = typeof d === 'string' ? new Date(d) : d;
+  return dt.toLocaleDateString('en-US', {month:'short', day:'numeric'});
+}
+function timeAgo(d){
+  if(!d) return '—';
+  const ms = Date.now() - new Date(d).getTime();
+  const days = Math.floor(ms / (1000*60*60*24));
+  if(days < 0) return 'in the future';
+  if(days === 0) return 'today';
+  if(days === 1) return 'yesterday';
+  if(days < 7)  return days + ' days ago';
+  if(days < 14) return '1 week ago';
+  if(days < 60) return Math.floor(days/7) + ' weeks ago';
+  return Math.floor(days/30) + ' months ago';
+}
+function escapeHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ============================================================
+// Status calculation per shop_job
+// ============================================================
+// Returns {kind, label, station, lastEventAt, badgeClass}
+// kind ∈ 'dispatched' | 'progress' | 'completed' | 'shipped'
+function computeStatus(job, events){
+  const jobEvents = events.filter(e => e.shop_job_id === job.id)
+                          .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  if(jobEvents.length === 0){
+    return {
+      kind:'dispatched', label:'Dispatched', station:null,
+      lastEventAt: job.dispatched_at, badgeClass:'dispatched'
+    };
+  }
+  const latest = jobEvents[0];
+  const station = (latest.station || '').toUpperCase();
+  const isShippedStation = (station === 'SHIPPED' || station === 'SHIP');
+
+  if(latest.event_type === 'checkout' && isShippedStation){
+    return {kind:'shipped', label:'Shipped ✓', station:'SHIPPED',
+            lastEventAt:latest.created_at, badgeClass:'shipped'};
+  }
+  if(latest.event_type === 'checkin'){
+    return {kind:'progress', label:'In ' + station, station,
+            lastEventAt:latest.created_at, badgeClass:'progress'};
+  }
+  // checkout from a non-ship station = completed that station, awaiting next step
+  return {kind:'completed', label:'Completed ' + station, station,
+          lastEventAt:latest.created_at, badgeClass:'completed'};
+}
+
+// "Active" filter: include unless shipped MORE than 7 days ago.
+function isActive(status){
+  if(status.kind !== 'shipped') return true;
+  const days = (Date.now() - new Date(status.lastEventAt).getTime()) / (1000*60*60*24);
+  return days <= 7;
+}
+
+// ============================================================
+// Render
+// ============================================================
+function fail(msg){
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('paper').style.display = 'block';
+  document.getElementById('err-area').innerHTML =
+    `<div class="err">⚠ ${escapeHtml(msg)}</div>`;
+}
+
+function renderEmpty(customerName){
+  document.getElementById('po-list').innerHTML =
+    `<div class="empty">No active jobs for ${escapeHtml(customerName)} at this time.</div>`;
+  document.getElementById('summary').innerHTML = `
+    <div class="tile"><div class="label">Active Jobs</div><div class="val">0</div></div>
+    <div class="tile"><div class="label">In Progress</div><div class="val">0</div></div>
+    <div class="tile"><div class="label">Ready / Shipped</div><div class="val">0</div></div>`;
+}
+
+function renderReport(customerName, jobs, events){
+  // Compute status for every job
+  const annotated = jobs.map(j => ({job:j, status:computeStatus(j, events)}));
+
+  // Filter to active
+  const active = annotated.filter(a => isActive(a.status));
+
+  // Sort: shipped last, then by PO ascending, then detail number
+  active.sort((a,b) => {
+    const aShipped = a.status.kind === 'shipped' ? 1 : 0;
+    const bShipped = b.status.kind === 'shipped' ? 1 : 0;
+    if(aShipped !== bShipped) return aShipped - bShipped;
+    const ap = (a.job.po_number || '').toString();
+    const bp = (b.job.po_number || '').toString();
+    if(ap !== bp) return ap.localeCompare(bp, undefined, {numeric:true});
+    const ad = (a.job.detail_number || '').toString();
+    const bd = (b.job.detail_number || '').toString();
+    return ad.localeCompare(bd, undefined, {numeric:true});
+  });
+
+  if(active.length === 0){
+    renderEmpty(customerName);
+    return;
+  }
+
+  // Tiles
+  const inProgress = active.filter(a => a.status.kind === 'progress').length;
+  const completedOrShipped = active.filter(a => a.status.kind === 'completed' || a.status.kind === 'shipped').length;
+  document.getElementById('summary').innerHTML = `
+    <div class="tile">
+      <div class="label">Active Jobs</div>
+      <div class="val">${active.length}</div>
+      <div class="sub">across ${new Set(active.map(a=>a.job.po_number||'—')).size} PO${new Set(active.map(a=>a.job.po_number||'—')).size===1?'':'s'}</div>
+    </div>
+    <div class="tile">
+      <div class="label">In Progress</div>
+      <div class="val">${inProgress}</div>
+      <div class="sub">currently at a station</div>
+    </div>
+    <div class="tile">
+      <div class="label">Ready / Shipped</div>
+      <div class="val">${completedOrShipped}</div>
+      <div class="sub">completed a step or shipped</div>
+    </div>`;
+
+  // Group by PO
+  const byPO = new Map();
+  for(const a of active){
+    const po = a.job.po_number || '—';
+    if(!byPO.has(po)) byPO.set(po, []);
+    byPO.get(po).push(a);
+  }
+
+  // Render PO blocks
+  const blocks = [];
+  for(const [po, group] of byPO){
+    // Earliest due date in the group, if any
+    const dues = group.map(a => a.job.due_date).filter(Boolean).map(d => new Date(d));
+    const minDue = dues.length ? dues.reduce((a,b) => a < b ? a : b) : null;
+
+    const rows = group.map(a => {
+      const j = a.job, s = a.status;
+      const desc = j.detail_name && j.detail_name.trim() ? j.detail_name : '<span style="color:var(--ink-light);">(no description)</span>';
+      const qty = j.quantity || 1;
+      const lastWhen = s.lastEventAt ? `${timeAgo(s.lastEventAt)}<br><span style="font-size:10px;">${fmtDateShort(s.lastEventAt)}</span>` : '—';
+      return `<tr>
+        <td class="col-det">${escapeHtml(String(j.detail_number||'—'))}</td>
+        <td class="col-desc">${escapeHtml(desc).replace('&lt;span','<span').replace('&lt;/span&gt;','</span>')}</td>
+        <td class="col-qty">${qty}</td>
+        <td class="col-status"><span class="badge ${s.badgeClass}">${escapeHtml(s.label)}</span></td>
+        <td class="col-activity">${lastWhen}</td>
+      </tr>`;
+    }).join('');
+
+    blocks.push(`
+      <div class="po-block">
+        <div class="po-header">
+          <span class="ponum">${escapeHtml(po)}</span>
+          <span class="label-meta">${group.length} detail${group.length===1?'':'s'}</span>
+          ${minDue ? `<span class="due">Due <strong>${fmtDateShort(minDue)}</strong></span>` : ''}
+        </div>
+        <table class="details">
+          <thead><tr>
+            <th>Detail</th>
+            <th>Description</th>
+            <th style="text-align:right;">Qty</th>
+            <th>Status</th>
+            <th>Last activity</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`);
+  }
+
+  document.getElementById('po-list').innerHTML = blocks.join('');
+}
+
+// ============================================================
+// Boot
+// ============================================================
+async function boot(){
+  // Auth
+  if(!loadTokens()){
+    fail('Not signed in — please log in to the quoting app first.');
+    return;
+  }
+  // Verify session is alive (refresh if needed)
+  try {
+    await sbFetch('/auth/v1/user');
+  } catch(e){
+    const ok = await refreshSession();
+    if(!ok){ fail('Session expired — please log in again.'); return; }
+  }
+
+  // Pull customer from URL
+  const params = new URLSearchParams(window.location.search);
+  const customerParam = params.get('customer');
+  if(!customerParam){
+    fail('No customer specified. Please open this report from the Customers page.');
+    return;
+  }
+
+  // Header dates
+  const now = new Date();
+  document.getElementById('gen-date').textContent = fmtDate(now);
+  document.getElementById('gen-stamp').innerHTML = `Generated <strong>${fmtDate(now)}</strong> · ${now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}`;
+  document.getElementById('footer-date').textContent = `Generated ${fmtDate(now)}`;
+  document.getElementById('customer-name').textContent = customerParam;
+
+  // Find all quote_ids that belong to this customer (fuzzy normalized match).
+  // We grab a wide-net ILIKE on the first significant word, then narrow with _custNormalize.
+  const targetNorm = _custNormalize(customerParam);
+  if(!targetNorm){ fail('Invalid customer name.'); return; }
+  const firstWord = targetNorm.split(' ')[0];
+
+  let candidateQuotes = [];
+  try {
+    candidateQuotes = await sbFetch(`/rest/v1/quotes?select=id,customer_name&customer_name=ilike.%25${encodeURIComponent(firstWord)}%25`);
+  } catch(e) {
+    fail('Could not load quotes: ' + e.message);
+    return;
+  }
+  const matchingQuoteIds = candidateQuotes
+    .filter(q => _custNormalize(q.customer_name) === targetNorm)
+    .map(q => q.id);
+
+  if(matchingQuoteIds.length === 0){
+    document.title = `AWF Status — ${customerParam}`;
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('paper').style.display = 'block';
+    renderEmpty(customerParam);
+    return;
+  }
+
+  // Fetch all shop_jobs for those quotes (using in.() with comma-separated IDs).
+  // Supabase PostgREST supports up to ~1000 IDs per request; we expect far fewer.
+  const idsCsv = matchingQuoteIds.map(id => `"${id}"`).join(',');
+  let jobs = [];
+  try {
+    jobs = await sbFetch(
+      `/rest/v1/shop_jobs?select=id,quote_id,po_number,detail_number,detail_name,quantity,due_date,dispatched_at&quote_id=in.(${idsCsv})&order=po_number.asc,detail_number.asc`
+    );
+  } catch(e) {
+    fail('Could not load shop jobs: ' + e.message);
+    return;
+  }
+
+  if(jobs.length === 0){
+    document.title = `AWF Status — ${customerParam}`;
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('paper').style.display = 'block';
+    renderEmpty(customerParam);
+    return;
+  }
+
+  // Fetch all events for those jobs
+  const jobIdsCsv = jobs.map(j => `"${j.id}"`).join(',');
+  let events = [];
+  try {
+    events = await sbFetch(
+      `/rest/v1/shop_events?select=id,shop_job_id,station,event_type,created_at&shop_job_id=in.(${jobIdsCsv})&order=created_at.desc`
+    );
+  } catch(e) {
+    fail('Could not load shop events: ' + e.message);
+    return;
+  }
+
+  // Render
+  document.title = `AWF Status — ${customerParam}`;
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('paper').style.display = 'block';
+  renderReport(customerParam, jobs, events);
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
