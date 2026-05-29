@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWF Quoting — Customers</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
+:root {
+  --bg:#0f1117; --surface:#1a1d27; --surface2:#22263a; --border:#2e3248; --border2:#3d4260;
+  --text:#e8e9f0; --text2:#8b8fa8; --text3:#5a5d72;
+  --amber:#f5a623; --amber-dim:#3d2a08;
+  --teal:#2dd4bf; --teal-dim:#134e48;
+  --red:#f87171;
+  --green:#4ade80;
+  --font:'DM Mono',monospace; --sans:'DM Sans',system-ui,sans-serif;
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+
+.topbar{position:fixed;top:0;left:0;right:0;height:46px;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;}
+.topbar-logo{font-family:var(--font);font-size:13px;font-weight:500;color:var(--amber);}
+.topbar-sep{width:1px;height:18px;background:var(--border);}
+.topbar-title{font-size:13px;color:var(--text2);}
+.topbar-right{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px;color:var(--text3);}
+.topbar-link{color:var(--text2);text-decoration:none;padding:5px 10px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;}
+.topbar-link:hover{border-color:var(--teal);color:var(--teal);}
+
+.page{padding:64px 20px 32px;max-width:1400px;margin:0 auto;}
+.page-hdr{display:flex;align-items:baseline;gap:16px;margin-bottom:16px;flex-wrap:wrap;}
+.page-title{font-size:20px;font-weight:600;}
+.page-sub{font-size:12px;color:var(--text3);font-family:var(--font);}
+.page-meta{margin-left:auto;font-size:11px;color:var(--text3);font-family:var(--font);}
+
+.summary-bar{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.summary-tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;min-width:140px;}
+.summary-tile-label{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);font-family:var(--font);margin-bottom:3px;}
+.summary-tile-val{font-size:18px;font-weight:600;color:var(--text);}
+.summary-tile-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+table.report{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.report th{background:var(--surface2);color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:.06em;font-size:10px;padding:10px 12px;text-align:right;cursor:pointer;user-select:none;border-bottom:1px solid var(--border);font-family:var(--font);position:sticky;top:46px;z-index:50;}
+table.report th:hover{color:var(--amber);}
+table.report th.sort-asc::after{content:' ▲';color:var(--amber);font-size:9px;}
+table.report th.sort-desc::after{content:' ▼';color:var(--amber);font-size:9px;}
+table.report th:first-child,table.report td:first-child{text-align:left;}
+table.report td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:right;font-family:var(--sans);}
+table.report tbody tr{cursor:pointer;transition:background .12s;}
+table.report tbody tr:hover{background:var(--surface2);}
+table.report tbody tr:last-child td{border-bottom:none;}
+table.report td.customer{font-weight:500;color:var(--text);}
+table.report td.muted{color:var(--text3);}
+table.report tr.totals{background:var(--surface2);font-weight:600;border-top:2px solid var(--border2);}
+table.report tr.totals td{border-bottom:none;}
+table.report tr.totals td:first-child{color:var(--amber);font-family:var(--font);font-size:11px;letter-spacing:.05em;text-transform:uppercase;}
+
+.empty{padding:48px 16px;text-align:center;color:var(--text3);font-size:13px;}
+#loader{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:200;}
+.spinner{width:24px;height:24px;border:2px solid var(--border2);border-top-color:var(--amber);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.err-banner{background:var(--surface);border:1px solid var(--red);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;color:var(--red);font-size:13px;}
+.note{font-size:11px;color:var(--text3);margin-top:14px;line-height:1.5;font-family:var(--sans);}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div style="font-family:var(--font);color:var(--amber);font-size:18px;">AWF</div>
+  <div class="spinner"></div>
+  <div style="font-size:11px;color:var(--text3);font-family:var(--font);">Loading customers…</div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-logo">AWF</div>
+  <div class="topbar-sep"></div>
+  <div class="topbar-title">Customer Report</div>
+  <div class="topbar-right">
+    <a class="topbar-link" href="index.html">← Quotes</a>
+  </div>
+</div>
+
+<div class="page" id="page" style="display:none;">
+  <div class="page-hdr">
+    <div class="page-title">Customers</div>
+    <div class="page-sub" id="page-sub">—</div>
+    <div class="page-meta" id="page-meta">—</div>
+  </div>
+
+  <div class="summary-bar" id="summary-bar"></div>
+
+  <div id="err-area"></div>
+
+  <div class="table-wrap">
+    <table class="report" id="report-table">
+      <thead>
+        <tr>
+          <th data-sort="display">Customer</th>
+          <th data-sort="mtdCount" title="Number of quotes created this calendar month">MTD #</th>
+          <th data-sort="mtdValue" title="Sum of quote totals this month, with quotes &gt;$100K counted at 50%">MTD $</th>
+          <th data-sort="ytdCount" title="Number of quotes created this calendar year">YTD #</th>
+          <th data-sort="ytdValue" class="sort-desc" title="Sum of quote totals YTD, with quotes &gt;$100K counted at 50%">YTD $</th>
+          <th data-sort="avgValue" title="YTD $ ÷ YTD count (discounted)">Avg $</th>
+          <th data-sort="winPct" title="Won $ (full value) ÷ Quoted $ (discounted)">Win %</th>
+          <th data-sort="winValue" title="Lifetime sum of won quote totals, at full face value">Win $</th>
+        </tr>
+      </thead>
+      <tbody id="report-body"></tbody>
+      <tfoot id="report-foot"></tfoot>
+    </table>
+  </div>
+
+  <div class="note">
+    Customer rows are <strong>fuzzy-grouped</strong> (e.g. "Acme Corp" and "Acme, Inc." are combined). Click any row to view that customer's quotes.
+    Quotes over $100K count at 50% in the MTD/YTD/Avg $ columns to dampen pipeline-skew from speculative bids; the <strong>Win $</strong> column is at full face value because won money is real.
+    Click any column header to re-sort.
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Supabase client — same pattern as index.html
+// ============================================================
+const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
+const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+
+let _accessToken = null;
+let _refreshToken = null;
+let _expiresAt = 0;
+
+function loadTokens(){
+  try {
+    const raw = localStorage.getItem('sb_tokens');
+    if(!raw) return false;
+    const t = JSON.parse(raw);
+    _accessToken = t.access_token; _refreshToken = t.refresh_token; _expiresAt = t.expires_at || 0;
+    return !!_accessToken;
+  } catch(e){ return false; }
+}
+
+async function refreshSession(){
+  if(!_refreshToken) return false;
+  try {
+    const r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=refresh_token',{
+      method:'POST',
+      headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
+      body:JSON.stringify({refresh_token:_refreshToken})
+    });
+    if(!r.ok) return false;
+    const d = await r.json();
+    _accessToken = d.access_token; _refreshToken = d.refresh_token;
+    _expiresAt = Math.floor(Date.now()/1000) + (d.expires_in||3600);
+    localStorage.setItem('sb_tokens', JSON.stringify({access_token:_accessToken, refresh_token:_refreshToken, expires_at:_expiresAt}));
+    return true;
+  } catch(e){ return false; }
+}
+
+async function sbFetch(path, options={}){
+  // Auto-refresh if token within 60s of expiry
+  if(_expiresAt && Math.floor(Date.now()/1000) > _expiresAt - 60){
+    await refreshSession();
+  }
+  const headers = {
+    'apikey': SUPABASE_ANON,
+    'Content-Type': 'application/json',
+    ...options.headers
+  };
+  if(_accessToken) headers['Authorization'] = 'Bearer ' + _accessToken;
+  const res = await fetch(SUPABASE_URL + path, {...options, headers});
+  if(!res.ok){
+    const err = await res.json().catch(() => ({message:res.statusText}));
+    throw new Error(err.message || res.statusText);
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
+}
+
+// ============================================================
+// Same normalization as autocomplete in index.html
+// ============================================================
+function _custNormalize(s){
+  return (s||'').toLowerCase().replace(/[.,;:'"()&\-_/\\]/g,' ').replace(/\s+/g,' ').trim()
+    .replace(/\b(inc|incorporated|llc|l\.l\.c\.|corp|corporation|co|company|ltd|limited|pllc|pc)\b/g,'').trim();
+}
+
+// ============================================================
+// Format helpers
+// ============================================================
+const fmt$ = n => n>=1000 ? '$'+Math.round(n).toLocaleString() : '$'+(n||0).toFixed(0);
+const fmt$k = n => {
+  if(!n) return '$0';
+  if(Math.abs(n) >= 10000) return '$'+(n/1000).toFixed(0)+'K';
+  return '$'+Math.round(n).toLocaleString();
+};
+const fmtPct = n => (n*100).toFixed(0) + '%';
+const fmtInt = n => (n||0).toLocaleString();
+
+// ============================================================
+// Aggregation
+// ============================================================
+// Discount rule from dashboard: quotes >$100K count at 50% for pipeline/quoted columns.
+// Won $ uses face value because won money is real.
+function discountedValue(total){
+  const v = parseFloat(total) || 0;
+  return v > 100000 ? v * 0.5 : v;
+}
+
+function aggregateQuotes(quotes){
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const yearStart  = new Date(now.getFullYear(), 0, 1);
+
+  // Map normalized → aggregate
+  const groups = new Map();
+
+  for(const q of quotes){
+    const raw = (q.customer_name||'').trim();
+    if(!raw) continue;
+    const norm = _custNormalize(raw);
+    if(!norm) continue;
+
+    let g = groups.get(norm);
+    if(!g){
+      g = {
+        norm,
+        display: raw,
+        displayCounts: new Map(),   // for picking best display variant
+        mtdCount:0, mtdValue:0,
+        ytdCount:0, ytdValue:0,
+        totalCount:0, totalQuoted:0,  // for win-rate denominator (discounted)
+        winCount:0,   winValue:0       // win$ at face value
+      };
+      groups.set(norm, g);
+    }
+
+    // Track display variant frequency (we'll pick the most common, tiebreak longest)
+    g.displayCounts.set(raw, (g.displayCounts.get(raw)||0) + 1);
+
+    const total = parseFloat(q.total_price) || 0;
+    const disc  = discountedValue(total);
+    const created = q.created_at ? new Date(q.created_at) : null;
+
+    if(created && created >= yearStart){
+      g.ytdCount++;
+      g.ytdValue += disc;
+      if(created >= monthStart){
+        g.mtdCount++;
+        g.mtdValue += disc;
+      }
+    }
+
+    // Win-rate denominator: ALL quotes in current data (discounted)
+    g.totalCount++;
+    g.totalQuoted += disc;
+
+    if(q.won){
+      g.winCount++;
+      g.winValue += total;  // face value, not discounted
+    }
+  }
+
+  // Finalize rows
+  const rows = [];
+  for(const g of groups.values()){
+    // Pick display name: most frequent variant, tiebreak by longest
+    let bestName = g.display;
+    let bestCount = -1;
+    for(const [name, count] of g.displayCounts){
+      if(count > bestCount || (count === bestCount && name.length > bestName.length)){
+        bestName = name; bestCount = count;
+      }
+    }
+    g.display = bestName;
+    g.avgValue = g.ytdCount > 0 ? g.ytdValue / g.ytdCount : 0;
+    g.winPct   = g.totalQuoted > 0 ? g.winValue / g.totalQuoted : 0;
+    rows.push(g);
+  }
+
+  return rows;
+}
+
+function computeTotals(rows){
+  return rows.reduce((t,r) => ({
+    mtdCount:  t.mtdCount  + r.mtdCount,
+    mtdValue:  t.mtdValue  + r.mtdValue,
+    ytdCount:  t.ytdCount  + r.ytdCount,
+    ytdValue:  t.ytdValue  + r.ytdValue,
+    totalQuoted: t.totalQuoted + r.totalQuoted,
+    winValue:  t.winValue  + r.winValue
+  }), {mtdCount:0,mtdValue:0,ytdCount:0,ytdValue:0,totalQuoted:0,winValue:0});
+}
+
+// ============================================================
+// Render
+// ============================================================
+let allRows = [];
+let currentSort = {key:'ytdValue', dir:'desc'};
+
+function renderTable(){
+  const sorted = [...allRows].sort((a,b) => {
+    const av = a[currentSort.key], bv = b[currentSort.key];
+    if(typeof av === 'string'){
+      return currentSort.dir==='asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    return currentSort.dir==='asc' ? (av-bv) : (bv-av);
+  });
+
+  // Update sort indicators
+  document.querySelectorAll('table.report th').forEach(th => {
+    th.classList.remove('sort-asc','sort-desc');
+    if(th.dataset.sort === currentSort.key){
+      th.classList.add(currentSort.dir==='asc' ? 'sort-asc' : 'sort-desc');
+    }
+  });
+
+  const body = document.getElementById('report-body');
+  if(!sorted.length){
+    body.innerHTML = '<tr><td colspan="8" class="empty">No quotes found.</td></tr>';
+    document.getElementById('report-foot').innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = sorted.map(r => {
+    const winPctStr = r.totalCount === 0 ? '—' : fmtPct(r.winPct);
+    return `<tr onclick="openCustomerQuotes('${escapeAttr(r.display)}')">
+      <td class="customer">${escapeHtml(r.display)}</td>
+      <td>${r.mtdCount ? fmtInt(r.mtdCount) : '<span class="muted">—</span>'}</td>
+      <td>${r.mtdValue ? fmt$k(r.mtdValue) : '<span class="muted">—</span>'}</td>
+      <td>${r.ytdCount ? fmtInt(r.ytdCount) : '<span class="muted">—</span>'}</td>
+      <td>${r.ytdValue ? fmt$k(r.ytdValue) : '<span class="muted">—</span>'}</td>
+      <td>${r.avgValue ? fmt$k(r.avgValue) : '<span class="muted">—</span>'}</td>
+      <td>${winPctStr}</td>
+      <td>${r.winValue ? fmt$k(r.winValue) : '<span class="muted">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // Totals row
+  const t = computeTotals(sorted);
+  const tWinPct = t.totalQuoted > 0 ? t.winValue / t.totalQuoted : 0;
+  const tAvg = t.ytdCount > 0 ? t.ytdValue / t.ytdCount : 0;
+  document.getElementById('report-foot').innerHTML = `
+    <tr class="totals">
+      <td>Totals (${sorted.length} customers)</td>
+      <td>${fmtInt(t.mtdCount)}</td>
+      <td>${fmt$k(t.mtdValue)}</td>
+      <td>${fmtInt(t.ytdCount)}</td>
+      <td>${fmt$k(t.ytdValue)}</td>
+      <td>${fmt$k(tAvg)}</td>
+      <td>${fmtPct(tWinPct)}</td>
+      <td>${fmt$k(t.winValue)}</td>
+    </tr>`;
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escapeAttr(s){
+  return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+}
+
+function openCustomerQuotes(name){
+  window.location.href = 'index.html?customer=' + encodeURIComponent(name);
+}
+
+// ============================================================
+// Sort header clicks
+// ============================================================
+document.querySelectorAll('table.report th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if(!key) return;
+    if(currentSort.key === key){
+      currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      currentSort.key = key;
+      // Text columns default asc, numeric desc
+      currentSort.dir = key === 'display' ? 'asc' : 'desc';
+    }
+    renderTable();
+  });
+});
+
+// ============================================================
+// Boot
+// ============================================================
+function fail(msg){
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('page').style.display = 'block';
+  document.getElementById('err-area').innerHTML =
+    `<div class="err-banner">⚠ ${escapeHtml(msg)} — please <a href="index.html" style="color:var(--amber);text-decoration:underline;">log in to the quoting app</a> first, then return here.</div>`;
+}
+
+async function boot(){
+  // Auth check
+  if(!loadTokens()){
+    fail('Not signed in');
+    return;
+  }
+  // Verify session works
+  try {
+    await sbFetch('/auth/v1/user');
+  } catch(e){
+    // Try refresh once
+    const ok = await refreshSession();
+    if(!ok){ fail('Session expired'); return; }
+  }
+
+  // Fetch all quotes (paged — Supabase default page cap is 1000)
+  // Q5000 → today is well under 1000, so a single page is plenty for now;
+  // we still iterate in case the database grows past that.
+  let all = [];
+  let from = 0;
+  const pageSize = 1000;
+  for(;;){
+    const page = await sbFetch(
+      `/rest/v1/quotes?select=id,customer_name,total_price,created_at,won&order=created_at.desc`,
+      {headers:{'Range':`${from}-${from+pageSize-1}`,'Range-Unit':'items'}}
+    ).catch(e => { throw new Error('Could not load quotes: '+e.message); });
+    if(!page || !page.length) break;
+    all = all.concat(page);
+    if(page.length < pageSize) break;
+    from += pageSize;
+    if(from > 50000) break;  // sanity guard
+  }
+
+  if(!all.length){
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('page').style.display = 'block';
+    document.getElementById('report-body').innerHTML = '<tr><td colspan="8" class="empty">No quotes found in the database.</td></tr>';
+    return;
+  }
+
+  // Aggregate
+  allRows = aggregateQuotes(all);
+
+  // Header metadata
+  const now = new Date();
+  const monthName = now.toLocaleString('en-US',{month:'long'});
+  const oldest = all[all.length-1];
+  const oldestDate = oldest ? new Date(oldest.created_at) : null;
+  document.getElementById('page-sub').textContent =
+    `${all.length.toLocaleString()} quotes · ${allRows.length} customers · MTD = ${monthName} ${now.getFullYear()}`;
+  document.getElementById('page-meta').textContent =
+    oldestDate ? `Data from ${oldestDate.toLocaleDateString()} → today` : '';
+
+  // Summary tiles
+  const t = computeTotals(allRows);
+  const tWinPct = t.totalQuoted > 0 ? t.winValue / t.totalQuoted : 0;
+  document.getElementById('summary-bar').innerHTML = `
+    <div class="summary-tile">
+      <div class="summary-tile-label">MTD Quoted</div>
+      <div class="summary-tile-val">${fmt$k(t.mtdValue)}</div>
+      <div class="summary-tile-sub">${fmtInt(t.mtdCount)} quotes · ${monthName}</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-tile-label">YTD Quoted</div>
+      <div class="summary-tile-val">${fmt$k(t.ytdValue)}</div>
+      <div class="summary-tile-sub">${fmtInt(t.ytdCount)} quotes</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-tile-label">Lifetime Win Rate</div>
+      <div class="summary-tile-val">${fmtPct(tWinPct)}</div>
+      <div class="summary-tile-sub">Won $ ÷ Quoted $</div>
+    </div>
+    <div class="summary-tile">
+      <div class="summary-tile-label">Lifetime Won</div>
+      <div class="summary-tile-val">${fmt$k(t.winValue)}</div>
+      <div class="summary-tile-sub">at face value</div>
+    </div>`;
+
+  renderTable();
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('page').style.display = 'block';
+}
+
+window.addEventListener('load', boot);
+</script>
+</body>
+</html>
