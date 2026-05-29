@@ -1353,7 +1353,8 @@ function _custNormalize(s){
 function _buildCustomerIndex(){
   // Map of normalized → {display: longest variant, count: occurrences}
   const map = new Map();
-  (window.quotes||[]).forEach(q => {
+  // `quotes` is the module-scope array populated by loadQuotes()
+  (typeof quotes !== 'undefined' ? quotes : []).forEach(q => {
     const raw = (q.customer_name||'').trim();
     if(!raw) return;
     const norm = _custNormalize(raw);
