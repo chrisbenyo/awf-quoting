@@ -488,8 +488,9 @@ table.bom select option{background:var(--surface2);}
       <div id="shop-pending-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
     </div>
     <div id="shop-active-panel" style="display:none;">
-      <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="active-search" class="sidebar-search" placeholder="🔍  Search PO, customer, detail, log #…" oninput="filterActiveList()" style="max-width:380px;margin-bottom:0;">
+        <button class="btn btn-ghost btn-sm" onclick="openStatusReportFromActive()" title="Open customer-facing status report for the customer currently filtered above" style="border-color:var(--teal);color:var(--teal);">📋 Customer Status Report</button>
       </div>
       <div id="shop-active-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
     </div>
@@ -3631,6 +3632,34 @@ function filterActiveList() {
     const hay = [job.po_number, job.customer, job.detail_number, job.detail_name, job.log_number, job.stage].join(' ').toLowerCase();
     row.style.display = (!term || hay.includes(term)) ? '' : 'none';
   });
+}
+
+// Opens the customer-facing status report in a new tab, using whichever customer the
+// active-jobs list is currently filtered to. Determines that customer by looking at
+// the visible (non-display:none) rows. Behaves friendly if 0 or >1 customers visible.
+function openStatusReportFromActive() {
+  const rows = document.querySelectorAll('#shop-active-list tbody tr');
+  if (!rows.length) {
+    alert('No active jobs loaded yet. Wait for the list to finish loading, then try again.');
+    return;
+  }
+  const visibleCustomers = new Set();
+  rows.forEach((row, i) => {
+    if (row.style.display === 'none') return;
+    const job = _activeRows[i];
+    if (!job || !job.customer) return;
+    visibleCustomers.add(job.customer.trim());
+  });
+  if (visibleCustomers.size === 0) {
+    alert('No matching jobs visible. Clear the search or type a customer name first.');
+    return;
+  }
+  if (visibleCustomers.size > 1) {
+    alert('Multiple customers are visible (' + visibleCustomers.size + '). Filter to one customer by typing their name in the search box above, then click again.');
+    return;
+  }
+  const customer = [...visibleCustomers][0];
+  window.open('status.html?customer=' + encodeURIComponent(customer), '_blank');
 }
 
 // ── EDIT DISPATCHED DETAIL — standalone, no shopPendingData needed ──
