@@ -53,7 +53,15 @@ table.report td{padding:10px 12px;border-bottom:1px solid var(--border);text-ali
 table.report tbody tr{cursor:pointer;transition:background .12s;}
 table.report tbody tr:hover{background:var(--surface2);}
 table.report tbody tr:last-child td{border-bottom:none;}
-table.report td.customer{font-weight:500;color:var(--text);}
+table.report td.customer{font-weight:500;color:var(--text);display:flex;align-items:center;gap:10px;}
+table.report td.customer .cust-name{flex:1;}
+table.report td.customer .status-btn{
+  background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:4px;
+  padding:3px 8px;font-size:10.5px;cursor:pointer;font-family:var(--font);letter-spacing:.02em;
+  opacity:0;transition:opacity .15s, color .15s, border-color .15s;
+}
+table.report tbody tr:hover td.customer .status-btn{opacity:1;}
+table.report td.customer .status-btn:hover{color:var(--teal);border-color:var(--teal);}
 table.report td.muted{color:var(--text3);}
 table.report tr.totals{background:var(--surface2);font-weight:600;border-top:2px solid var(--border2);}
 table.report tr.totals td{border-bottom:none;}
@@ -339,7 +347,10 @@ function renderTable(){
   body.innerHTML = sorted.map(r => {
     const winPctStr = r.totalCount === 0 ? '—' : fmtPct(r.winPct);
     return `<tr onclick="openCustomerQuotes('${escapeAttr(r.display)}')">
-      <td class="customer">${escapeHtml(r.display)}</td>
+      <td class="customer">
+        <span class="cust-name">${escapeHtml(r.display)}</span>
+        <button class="status-btn" onclick="event.stopPropagation(); openCustomerStatus('${escapeAttr(r.display)}');" title="Open customer-facing status report">📋 Status</button>
+      </td>
       <td>${r.mtdCount ? fmtInt(r.mtdCount) : '<span class="muted">—</span>'}</td>
       <td>${r.mtdValue ? fmt$k(r.mtdValue) : '<span class="muted">—</span>'}</td>
       <td>${r.ytdCount ? fmtInt(r.ytdCount) : '<span class="muted">—</span>'}</td>
@@ -376,6 +387,12 @@ function escapeAttr(s){
 
 function openCustomerQuotes(name){
   window.location.href = 'index.html?customer=' + encodeURIComponent(name);
+}
+
+// Opens the customer-facing status report in a new tab so the user can review/print/PDF
+// without losing this Customers view. Triggered by the per-row 📋 Status button.
+function openCustomerStatus(name){
+  window.open('status.html?customer=' + encodeURIComponent(name), '_blank');
 }
 
 // ============================================================
