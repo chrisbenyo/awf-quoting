@@ -128,40 +128,52 @@ table.report tr.totals td:first-child{color:var(--amber);font-family:var(--font)
 const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
 
-let _accessToken = null;
+// Match index.html exactly: key='awf_token', fields={access,refresh,expiry}, expiry in ms (Date.now() + lifetime).
+let _authToken = null;
 let _refreshToken = null;
-let _expiresAt = 0;
+let _tokenExpiry = null;
 
-function loadTokens(){
+function saveTokens(access, refresh, expiresIn) {
+  _authToken = access;
+  _refreshToken = refresh;
+  _tokenExpiry = Date.now() + (expiresIn * 1000);
   try {
-    const raw = localStorage.getItem('sb_tokens');
-    if(!raw) return false;
-    const t = JSON.parse(raw);
-    _accessToken = t.access_token; _refreshToken = t.refresh_token; _expiresAt = t.expires_at || 0;
-    return !!_accessToken;
-  } catch(e){ return false; }
+    localStorage.setItem('awf_token', JSON.stringify({access, refresh, expiry: _tokenExpiry}));
+  } catch(e) {}
 }
 
-async function refreshSession(){
-  if(!_refreshToken) return false;
+function loadTokens() {
   try {
-    const r = await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=refresh_token',{
-      method:'POST',
-      headers:{'apikey':SUPABASE_ANON,'Content-Type':'application/json'},
-      body:JSON.stringify({refresh_token:_refreshToken})
-    });
-    if(!r.ok) return false;
-    const d = await r.json();
-    _accessToken = d.access_token; _refreshToken = d.refresh_token;
-    _expiresAt = Math.floor(Date.now()/1000) + (d.expires_in||3600);
-    localStorage.setItem('sb_tokens', JSON.stringify({access_token:_accessToken, refresh_token:_refreshToken, expires_at:_expiresAt}));
-    return true;
-  } catch(e){ return false; }
+    const stored = JSON.parse(localStorage.getItem('awf_token') || 'null');
+    if (stored && stored.expiry > Date.now()) {
+      _authToken = stored.access;
+      _refreshToken = stored.refresh;
+      _tokenExpiry = stored.expiry;
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+async function refreshSession() {
+  if (!_refreshToken) return false;
+  try {
+    const data = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+      method: 'POST',
+      headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
+      body: JSON.stringify({refresh_token: _refreshToken})
+    }).then(r => r.json());
+    if (data.access_token) {
+      saveTokens(data.access_token, data.refresh_token, data.expires_in);
+      return true;
+    }
+  } catch(e) {}
+  return false;
 }
 
 async function sbFetch(path, options={}){
-  // Auto-refresh if token within 60s of expiry
-  if(_expiresAt && Math.floor(Date.now()/1000) > _expiresAt - 60){
+  // Refresh if token expires within 5 minutes (same threshold as index.html)
+  if (_authToken && _tokenExpiry && _tokenExpiry - Date.now() < 300000) {
     await refreshSession();
   }
   const headers = {
@@ -169,7 +181,7 @@ async function sbFetch(path, options={}){
     'Content-Type': 'application/json',
     ...options.headers
   };
-  if(_accessToken) headers['Authorization'] = 'Bearer ' + _accessToken;
+  if(_authToken) headers['Authorization'] = 'Bearer ' + _authToken;
   const res = await fetch(SUPABASE_URL + path, {...options, headers});
   if(!res.ok){
     const err = await res.json().catch(() => ({message:res.statusText}));
