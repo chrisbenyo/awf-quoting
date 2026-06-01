@@ -321,7 +321,7 @@ function buildWeeklyChart(weeks){
 }
 buildWeeklyChart(WKS_HIST);
 
-buildChart(0,[]);
+buildChart(0,[],[],null);
 
 
 const WON_2025=[131459,188272,223991,174415,230741,143309,147676,156113,166444,193575,108123,211512];
@@ -537,7 +537,7 @@ async function loadLive() {
 
   } catch(e) {
     document.getElementById('recentQuotes').innerHTML = `<div class="error-msg">Connection error: ${e.message}</div>`;
-    buildChart(0,[]);
+    buildChart(0,[],[],null);
     console.error(e);
   }
 }
