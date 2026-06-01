@@ -107,7 +107,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   <div class="metric"><div class="metric-label" id="m1label">loading...</div><div class="metric-value" id="m1val">—</div><div class="metric-sub" id="m1sub">loading...</div></div>
   <div class="metric"><div class="metric-label">Won this month</div><div class="metric-value" id="m2val">—</div><div class="metric-sub" id="m2sub">loading...</div></div>
   <div class="metric"><div class="metric-label">Open quotes (live)</div><div class="metric-value" id="m3val">—</div><div class="metric-sub" id="m3sub">loading...</div></div>
-  <div class="metric"><div class="metric-label">All-time avg</div><div class="metric-value">$917K</div><div class="metric-sub">37-month baseline (thru Apr '26)</div></div>
+  <div class="metric"><div class="metric-label">All-time avg</div><div class="metric-value" id="allTimeAvgVal">—</div><div class="metric-sub" id="allTimeAvgSub">loading...</div></div>
 </div>
 
 <div class="chart-row">
@@ -117,7 +117,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
       <span class="leg"><span class="leg-sq" style="background:#185FA5;"></span>2025–26 historical</span>
       <span class="leg"><span class="leg-sq" style="background:#2dd4bf;"></span>live (quoting engine)</span>
       <span class="leg"><span class="leg-sq" style="background:#3d4260;"></span>2024–25</span>
-      <span class="leg"><span class="leg-sq" style="background:#4ade80;border-radius:0;height:2px;width:14px;"></span>avg $936K</span>
+      <span class="leg"><span class="leg-sq" style="background:#4ade80;border-radius:0;height:2px;width:14px;"></span><span id="legendAvg">avg —</span></span>
     </div>
     <div style="position:relative;height:220px;">
       <canvas id="volChart" role="img" aria-label="Monthly quote volume 24 months"></canvas>
@@ -226,29 +226,31 @@ const H25 = [821324,583491,824355,881963,1052211,1012733,863210,859272,884821,11
 const H26 = [906952,889274,1367820,933525,1035669,1269595,937617,1081375,1224766,1004998,869535,764000];
 
 let vc = null;
-function buildChart(aprLive, extraMonths) {
+function buildChart(aprLive, fillerMonths, extraMonths, liveAvg) {
   // Calculate how many full historical months we have (May 2025 = month 0, Mar 2026 = month 10)
   // Apr 2026 = month 11, May 2026 = month 12, etc.
   const monthsSinceMay2025 = (CUR_YEAR - 2025) * 12 + CUR_MONTH - 4; // months after May 2025
   const histCount = Math.min(monthsSinceMay2025, 12); // we have H26 data for up to 12 months (May25-Apr26)
 
-  // Build labels: historical months + current month + extra
+  // Build labels: historical months + filler months (post-H26 completed) + current month + extra (future)
   const histLabels = HLABELS.slice(0, histCount);
-  // If current month not already in histLabels, add it
   const curLabel = CUR_MONTH_NAME.slice(0,3);
-  const labels = [...histLabels, curLabel, ...extraMonths.map(m=>m.label)];
+  const fillerLabels = fillerMonths.map(m => m.label);
+  const labels = [...histLabels, ...fillerLabels, curLabel, ...extraMonths.map(m=>m.label)];
 
-  // hist: H26 data for historical months, null for current and extra
-  const hist = [...H26.slice(0, histCount), null, ...new Array(extraMonths.length).fill(null)];
+  // hist: H26 data for historical months, null elsewhere
+  const hist = [...H26.slice(0, histCount), ...new Array(fillerLabels.length).fill(null), null, ...new Array(extraMonths.length).fill(null)];
 
-  // live: nulls for historical months, aprLive for current, extra values
-  const live = [...new Array(histCount).fill(null), aprLive, ...extraMonths.map(m=>m.value)];
+  // live: nulls for historical, fillerMonths values, current month live total, extra values
+  const live = [...new Array(histCount).fill(null), ...fillerMonths.map(m=>m.value), aprLive, ...extraMonths.map(m=>m.value)];
 
-  // prior: H25 data for historical months, prior year same month, nulls for extra
-  // H25 runs same months as H26 (May25-Mar26 = May24-Mar25)
-  // For Apr 2026, prior = Apr 2025 = 940111; for May 2026, prior = May 2025 = H25[0]=821324
+  // prior: H25 data for historical, PRIOR[monthIndex] for fillers and current, nulls for extras
   const priorCurMonth = PRIOR[CUR_MONTH] || 917456;
-  const prior = [...H25.slice(0, histCount), priorCurMonth, ...new Array(extraMonths.length).fill(null)];
+  const priorForFillers = fillerMonths.map(m => PRIOR[m.monthIndex] || 917456);
+  const prior = [...H25.slice(0, histCount), ...priorForFillers, priorCurMonth, ...new Array(extraMonths.length).fill(null)];
+
+  // Use liveAvg for the dashed average line (was hardcoded 917456 before).
+  const avgValue = liveAvg || 917456;
 
   if (vc) vc.destroy();
   vc = new Chart(document.getElementById('volChart'), {
@@ -257,7 +259,7 @@ function buildChart(aprLive, extraMonths) {
       {label:'Historical',data:hist,backgroundColor:'#185FA5',borderRadius:2},
       {label:'Live',data:live,backgroundColor:'#2dd4bf',borderRadius:2},
       {label:'Prior year',data:prior,backgroundColor:'#2e3248',borderRadius:2},
-      {label:'Avg',data:Array(labels.length).fill(917456),type:'line',borderColor:'#4ade80',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false}
+      {label:'Avg',data:Array(labels.length).fill(avgValue),type:'line',borderColor:'#4ade80',borderDash:[4,3],borderWidth:1.5,pointRadius:0,fill:false}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
@@ -383,7 +385,49 @@ async function loadLive() {
       const [yr,mo]=k.split('-');
       return {label:new Date(+yr,+mo-1,1).toLocaleString('default',{month:'short'}),value:v};
     });
-    buildChart(aprLive, extraMonths);
+
+    // ── Filler months: completed months that fall AFTER H26's last entry (Apr 2026)
+    //    but BEFORE the current month. Source from allYear (which spans Jan 1 → today).
+    //    On June 1 2026 this will populate May 2026; on July 1 it will populate May+June; etc.
+    //    Without this, months disappear after they stop being the "current" month.
+    const fillerByMonth = {};
+    (Array.isArray(allYear)?allYear:[]).forEach(q => {
+      const d = new Date(q.created_at);
+      const yr=d.getFullYear(), mo=d.getMonth();
+      const adj = elephantAdj(q.total_price||0);
+      const isPostH26 = (yr > 2026) || (yr === 2026 && mo > 3);          // after Apr 2026
+      const isBeforeCurrent = (yr < CUR_YEAR) || (yr === CUR_YEAR && mo < CUR_MONTH);
+      if (isPostH26 && isBeforeCurrent) {
+        const key = `${yr}-${String(mo+1).padStart(2,'0')}`;
+        if (!fillerByMonth[key]) fillerByMonth[key] = {sum:0, year:yr, monthIndex:mo};
+        fillerByMonth[key].sum += adj;
+      }
+    });
+    const fillerMonths = Object.entries(fillerByMonth).sort().map(([k,v]) => ({
+      label: new Date(v.year, v.monthIndex, 1).toLocaleString('default', {month:'short'}),
+      value: v.sum,
+      monthIndex: v.monthIndex,
+      year: v.year
+    }));
+
+    // ── Live all-time average: avg of all completed months in our dataset.
+    //    Data = H25 (12 months May24-Apr25) + H26 (12 months May25-Apr26) + filler months.
+    //    Current incomplete month is NOT included (would skew low until month-end).
+    const h25Sum = H25.reduce((a,b) => a+b, 0);
+    const h26Sum = H26.reduce((a,b) => a+b, 0);
+    const fillerSum = fillerMonths.reduce((a,m) => a+m.value, 0);
+    const totalMonths = H25.length + H26.length + fillerMonths.length;
+    const liveAvg = totalMonths > 0 ? (h25Sum + h26Sum + fillerSum) / totalMonths : 917456;
+
+    // Update the All-time avg tile and chart legend label
+    const avgEl = document.getElementById('allTimeAvgVal');
+    const subEl = document.getElementById('allTimeAvgSub');
+    const legEl = document.getElementById('legendAvg');
+    if (avgEl) avgEl.textContent = fmtK(liveAvg);
+    if (subEl) subEl.textContent = totalMonths + '-month avg · auto-updating';
+    if (legEl) legEl.textContent = 'avg ' + fmtK(liveAvg);
+
+    buildChart(aprLive, fillerMonths, extraMonths, liveAvg);
     const wonByWeekMap={},wkStart=new Date(2026,3,20);let wc=new Date(wkStart);
     while(wc<=new Date()){wonByWeekMap[`${wc.getMonth()+1}/${wc.getDate()}`]=0;wc.setDate(wc.getDate()+7);}
     (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at).forEach(q=>{
