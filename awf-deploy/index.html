@@ -3989,15 +3989,23 @@ async function loadActiveJobs() {
   _activeRows = enriched;
 
   panel.innerHTML = `
-  <div id="bulk-bar" style="display:none;background:var(--surface);border:1px solid var(--amber);border-radius:6px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap;">
-    <span id="bulk-count" style="font-family:var(--font);font-size:12px;color:var(--amber);font-weight:500;">0 selected</span>
-    <span style="color:var(--text3);font-size:11px;">→ Move to:</span>
-    <select id="bulk-stage-select" style="font-size:12px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
-      ${ALL_STAGES.map(s=>`<option value="${s}">${s}</option>`).join('')}
-    </select>
-    <button class="dispatch-btn" style="padding:5px 14px;font-size:12px;" onclick="bulkUpdateStage()">Apply →</button>
-    <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="clearJobSelection()">Clear</button>
-    <span style="color:var(--text3);font-size:10px;margin-left:auto;">SHIPPED also writes a checkout so the job leaves the floor.</span>
+  <div id="action-bar" style="display:none;background:var(--surface);border:1px solid var(--amber);border-radius:6px;padding:8px 14px;margin-bottom:10px;">
+    <div id="pending-row" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0;">
+      <span id="pending-count" style="font-family:var(--font);font-size:13px;color:var(--amber);font-weight:600;">0 pending stage change(s)</span>
+      <button class="dispatch-btn" style="padding:6px 16px;font-size:12px;font-weight:600;" onclick="saveAllStageChanges()">💾 Save All Changes</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="discardStageChanges()">↶ Discard</button>
+      <span style="color:var(--text3);font-size:10px;margin-left:auto;">Each change writes a checkin event. SHIPPED also writes a checkout.</span>
+    </div>
+    <div id="selection-row" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0;border-top:1px dashed var(--border);margin-top:4px;padding-top:8px;">
+      <span id="bulk-count" style="font-family:var(--font);font-size:12px;color:var(--text2);font-weight:500;">0 selected</span>
+      <span style="color:var(--text3);font-size:11px;">→ Stage to:</span>
+      <select id="bulk-stage-select" style="font-size:12px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+        ${ALL_STAGES.map(s=>`<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--amber);color:var(--amber);padding:4px 12px;" onclick="bulkStageSelected()">Stage Selected →</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="clearJobSelection()">Clear</button>
+      <span style="color:var(--text3);font-size:10px;margin-left:auto;">Stages selected rows; click Save All when ready.</span>
+    </div>
   </div>
   <table class="jobs-table">
     <thead><tr>
@@ -4029,8 +4037,9 @@ async function loadActiveJobs() {
           <td style="font-family:var(--font);font-size:11px;color:var(--text3);white-space:nowrap;">${wonLabel}</td>
           <td style="white-space:nowrap;"><span class="dispatch-due ${dueLabel.cls}" style="font-size:11px;">${dueLabel.text}</span></td>
           <td>
-            <select class="stage-select" style="font-size:11px;padding:2px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);"
-              onchange="updateJobStage('${job.id}',this.value)">
+            <select class="stage-select" data-orig-stage="${job.stage}" data-job-id="${job.id}" data-po="${esc(job.po_number||'')}" data-det="${esc(job.detail_number||'')}"
+              style="font-size:11px;padding:2px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);"
+              onchange="stageDropdownChanged('${job.id}',this)">
               ${stageOpts}
             </select>
           </td>
@@ -4040,93 +4049,166 @@ async function loadActiveJobs() {
       }).join('')}
     </tbody>
   </table>`;
+  // After render, re-apply any pending stage changes so sorting doesn't lose work-in-progress
+  applyPendingToUI();
 }
 
-async function updateJobStage(jobId, newStation) {
-  // Get the job details first so we can populate required event fields
-  const { data: job } = await sbDB.from('shop_jobs').select('po_number,detail_number').eq('id', jobId).single();
-  const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
-  const baseRec = {
-    shop_job_id:     jobId,
-    po_number:       job?.po_number || null,
-    detail_number:   job?.detail_number || null,
-    station:         newStation,
-    tablet_station:  newStation,
-    operator_initials: initials,
-  };
-  // SHIPPED is terminal: write both checkin AND checkout so the job leaves the floor
-  // (matches the shop floor app's one-scan SHIPPED behavior)
-  const rows = newStation === 'SHIPPED'
-    ? [{...baseRec, event_type: 'checkin', notes: 'Stage updated from office'}, {...baseRec, event_type: 'checkout', notes: null}]
-    : [{...baseRec, event_type: 'checkin', notes: 'Stage updated from office'}];
-  const { error } = await sbDB.from('shop_events').insert(rows);
-  if (error) { toast('Stage update error: ' + error.message, 'err'); await loadActiveJobs(); return; }
-  toast(`Moved to ${newStation} ✓`, 'ok');
-  await loadActiveJobs();
+// ── Staged stage edits: dropdowns accumulate changes locally, Save All commits batch ──
+let _pendingStageChanges = new Map(); // jobId -> {newStage, po, det, origStage}
+
+function stageDropdownChanged(jobId, selEl) {
+  const newStage  = selEl.value;
+  const origStage = selEl.dataset.origStage;
+  const po  = selEl.dataset.po || '';
+  const det = selEl.dataset.det || '';
+  if (newStage === origStage) {
+    _pendingStageChanges.delete(jobId);
+    markRowDirty(jobId, false);
+  } else {
+    _pendingStageChanges.set(jobId, {newStage, po, det, origStage});
+    markRowDirty(jobId, true, newStage);
+  }
+  updateActionBar();
 }
 
-// ── Bulk stage update ──
-function onJobCheckboxChange() {
-  const checked = document.querySelectorAll('.job-select:checked').length;
-  const bar = document.getElementById('bulk-bar');
-  if (bar) bar.style.display = checked ? 'flex' : 'none';
-  const countEl = document.getElementById('bulk-count');
-  if (countEl) countEl.textContent = `${checked} selected`;
-  // Update master select-all checkbox state
+function markRowDirty(jobId, dirty, newStage) {
+  const row = document.getElementById('jobrow-'+jobId);
+  if (!row) return;
+  const sel = row.querySelector('.stage-select');
+  if (dirty) {
+    row.style.background = 'rgba(255, 178, 36, 0.10)';
+    row.style.boxShadow  = 'inset 3px 0 0 var(--amber)';
+    if (sel) {
+      sel.style.borderColor = 'var(--amber)';
+      sel.style.color       = 'var(--amber)';
+      sel.style.fontWeight  = '600';
+    }
+  } else {
+    row.style.background = '';
+    row.style.boxShadow  = '';
+    if (sel) {
+      sel.style.borderColor = 'var(--border)';
+      sel.style.color       = 'var(--text)';
+      sel.style.fontWeight  = '';
+    }
+  }
+}
+
+function updateActionBar() {
+  const pendCount = _pendingStageChanges.size;
+  const selCount  = document.querySelectorAll('.job-select:checked').length;
+  const bar = document.getElementById('action-bar');
+  const pendRow = document.getElementById('pending-row');
+  const selRow  = document.getElementById('selection-row');
+  if (!bar) return;
+  bar.style.display = (pendCount > 0 || selCount > 0) ? 'block' : 'none';
+  if (pendRow) pendRow.style.display = pendCount > 0 ? 'flex' : 'none';
+  if (selRow)  selRow.style.display  = selCount  > 0 ? 'flex' : 'none';
+  const pc = document.getElementById('pending-count');
+  if (pc) pc.textContent = `${pendCount} pending stage change${pendCount!==1?'s':''}`;
+  const bc = document.getElementById('bulk-count');
+  if (bc) bc.textContent = `${selCount} selected`;
+  // Update master select-all state
   const all = document.querySelectorAll('.job-select');
   const master = document.getElementById('job-select-all');
   if (master) {
-    if (checked === 0) { master.checked = false; master.indeterminate = false; }
-    else if (checked === all.length) { master.checked = true; master.indeterminate = false; }
+    if (selCount === 0) { master.checked = false; master.indeterminate = false; }
+    else if (selCount === all.length) { master.checked = true; master.indeterminate = false; }
     else { master.indeterminate = true; }
   }
 }
 
+// After re-render (e.g. sort), re-apply any pending changes to the dropdowns so user's work isn't lost
+function applyPendingToUI() {
+  if (_pendingStageChanges.size === 0) { updateActionBar(); return; }
+  _pendingStageChanges.forEach((change, jobId) => {
+    const row = document.getElementById('jobrow-'+jobId);
+    if (!row) return;
+    const sel = row.querySelector('.stage-select');
+    if (sel) sel.value = change.newStage;
+    markRowDirty(jobId, true, change.newStage);
+  });
+  updateActionBar();
+}
+
+function onJobCheckboxChange() { updateActionBar(); }
+
 function toggleSelectAllJobs(checked) {
-  // Only select visible rows (respect any active filter)
   const rows = document.querySelectorAll('#shop-active-list tr');
   rows.forEach(r => {
     if (r.style.display === 'none') return;
     const cb = r.querySelector('.job-select');
     if (cb) cb.checked = !!checked;
   });
-  onJobCheckboxChange();
+  updateActionBar();
 }
 
 function clearJobSelection() {
   document.querySelectorAll('.job-select').forEach(cb => cb.checked = false);
   const master = document.getElementById('job-select-all');
   if (master) { master.checked = false; master.indeterminate = false; }
-  onJobCheckboxChange();
+  updateActionBar();
 }
 
-async function bulkUpdateStage() {
+// Bulk-stage selected rows: sets dropdowns to chosen stage AND adds to pending (doesn't save yet)
+function bulkStageSelected() {
   const checkboxes = document.querySelectorAll('.job-select:checked');
-  if (!checkboxes.length) { toast('No jobs selected', 'err'); return; }
+  if (!checkboxes.length) { toast('No rows selected', 'err'); return; }
   const stage = document.getElementById('bulk-stage-select').value;
   if (!stage) { toast('Pick a stage', 'err'); return; }
-  const count = checkboxes.length;
-  if (!confirm(`Move ${count} job${count!==1?'s':''} to ${stage}?${stage==='SHIPPED'?'\n\nSHIPPED will write both checkin+checkout — the jobs leave the floor.':''}`)) return;
+  let staged = 0;
+  Array.from(checkboxes).forEach(cb => {
+    const jobId = cb.dataset.jobId;
+    const row = document.getElementById('jobrow-'+jobId);
+    if (!row) return;
+    const sel = row.querySelector('.stage-select');
+    if (!sel) return;
+    sel.value = stage;
+    // Trigger the same logic as if user changed the dropdown manually
+    stageDropdownChanged(jobId, sel);
+    staged++;
+  });
+  // Uncheck after staging so the user can move on cleanly
+  document.querySelectorAll('.job-select').forEach(cb => cb.checked = false);
+  const master = document.getElementById('job-select-all');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  toast(`${staged} row${staged!==1?'s':''} staged → ${stage} (not saved yet)`, 'ok');
+  updateActionBar();
+}
+
+function discardStageChanges() {
+  if (_pendingStageChanges.size === 0) return;
+  if (!confirm(`Discard ${_pendingStageChanges.size} pending stage change${_pendingStageChanges.size!==1?'s':''}?`)) return;
+  _pendingStageChanges.clear();
+  loadActiveJobs();
+}
+
+// Save all pending stage changes in ONE batch DB call
+async function saveAllStageChanges() {
+  if (_pendingStageChanges.size === 0) { toast('No pending changes', 'err'); return; }
+  const count = _pendingStageChanges.size;
+  if (!confirm(`Save ${count} stage change${count!==1?'s':''} to the floor?`)) return;
 
   const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
-  const note = `Bulk stage update from office (${count} jobs → ${stage})`;
+  const note = `Office batch update (${count} jobs)`;
   const events = [];
-  Array.from(checkboxes).forEach(cb => {
+  _pendingStageChanges.forEach((change, jobId) => {
     const base = {
-      shop_job_id:     cb.dataset.jobId,
-      po_number:       cb.dataset.po || null,
-      detail_number:   cb.dataset.det || null,
-      station:         stage,
-      tablet_station:  stage,
+      shop_job_id:       jobId,
+      po_number:         change.po || null,
+      detail_number:     change.det || null,
+      station:           change.newStage,
+      tablet_station:    change.newStage,
       operator_initials: initials,
     };
-    events.push({...base, event_type: 'checkin', notes: note});
-    if (stage === 'SHIPPED') events.push({...base, event_type: 'checkout', notes: null});
+    events.push({...base, event_type: 'checkin',  notes: note});
+    if (change.newStage === 'SHIPPED') events.push({...base, event_type: 'checkout', notes: null});
   });
 
   const { error } = await sbDB.from('shop_events').insert(events);
-  if (error) { toast('Bulk update error: ' + error.message, 'err'); return; }
-  toast(`✓ ${count} job${count!==1?'s':''} → ${stage}`, 'ok');
+  if (error) { toast('Save error: ' + error.message, 'err'); return; }
+  toast(`✓ Saved ${count} change${count!==1?'s':''} (${events.length} event${events.length!==1?'s':''})`, 'ok');
+  _pendingStageChanges.clear();
   await loadActiveJobs();
 }
 
