@@ -3458,7 +3458,7 @@ async function loadPendingDispatch() {
   // Filter to quotes/details that have undispatched details
   shopPendingData = [];
   for (const q of wonQuotes) {
-    if (!q.po_number) continue;
+    // Note: previously filtered out null po_number — now we surface them with a "⚠ No PO" badge so they can be cleaned up
     const detailMap = quoteDetailMap[q.id] || {};
     const pendingDetails = [];
     const allDetailKeys = Object.keys(detailMap).sort((a,b) => parseInt(a)-parseInt(b));
@@ -3497,14 +3497,15 @@ async function loadPendingDispatch() {
     const dueDateStr = q.due_date ? formatDueDate(q.due_date).text : '—';
     return `
     <div class="dispatch-card" id="dcard-${ei}">
-      <div class="dispatch-card-hdr" onclick="toggleDispatchCard(${ei})">
-        <span class="dispatch-po">PO: ${esc(q.po_number)}</span>
+      <div class="dispatch-card-hdr" id="dhdr-${ei}" onclick="toggleDispatchCard(${ei})">
+        <span class="dispatch-po">${q.po_number ? 'PO: ' + esc(q.po_number) : '⚠ No PO'}</span>
         <span class="dispatch-customer">${esc(q.customer_name||'—')}</span>
         <div style="display:flex;gap:10px;align-items:center;font-family:var(--font);font-size:11px;">
           <span style="color:var(--text3);">Won: <span style="color:var(--text2);">${wonDateStr}</span></span>
           <span style="color:var(--text3);">Due: <span class="${dueLabel.cls}" style="font-weight:500;">${dueDateStr}</span></span>
         </div>
         <span class="dispatch-detail-count">${pendingCount} of ${totalCount} detail${totalCount!==1?'s':''} pending ▾</span>
+        <button class="btn btn-ghost btn-sm" title="Edit PO and Due Date" style="font-size:11px;padding:2px 8px;border-color:var(--amber);color:var(--amber);" onclick="event.stopPropagation();editQuoteHeader(${ei})">✎</button>
         ${pendingCount > 1 ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;border-color:var(--teal);color:var(--teal);white-space:nowrap;" onclick="event.stopPropagation();releaseAllForPO(${ei})">🏭 Release All (${pendingCount})</button>` : ''}
       </div>
       <div class="dispatch-body" id="dbody-${ei}">
@@ -3826,6 +3827,41 @@ async function dispatchDetail(ei, deti, editedName, logNumber) {
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
 
+function editQuoteHeader(ei) {
+  const entry = shopPendingData[ei];
+  if (!entry) return;
+  const q = entry.quote;
+  const hdr = document.getElementById(`dhdr-${ei}`);
+  if (!hdr) return;
+  hdr.onclick = null;  // disable card toggle while editing
+  hdr.innerHTML = `
+    <span style="font-family:var(--font);font-size:11px;color:var(--text3);align-self:center;">PO:</span>
+    <input id="edit-po-${ei}" value="${esc(q.po_number||'')}" placeholder="PO number" autocomplete="off"
+      style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--amber);font-family:var(--font);font-size:13px;font-weight:500;padding:5px 10px;width:160px;outline:none;">
+    <span style="font-family:var(--font);font-size:11px;color:var(--text3);align-self:center;margin-left:6px;">Due:</span>
+    <input id="edit-due-${ei}" type="date" value="${q.due_date||''}"
+      style="background:var(--bg);border:1px solid var(--amber);border-radius:4px;color:var(--text);font-size:12px;padding:4px 6px;outline:none;">
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <button class="dispatch-btn" onclick="saveQuoteHeader(${ei},'${q.id}')">Save</button>
+      <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="loadPendingDispatch()">Cancel</button>
+    </div>`;
+  setTimeout(() => document.getElementById(`edit-po-${ei}`)?.focus(), 50);
+}
+
+async function saveQuoteHeader(ei, qid) {
+  const poEl  = document.getElementById(`edit-po-${ei}`);
+  const dueEl = document.getElementById(`edit-due-${ei}`);
+  const po  = poEl ? (poEl.value.trim() || null) : null;
+  const due = dueEl ? (dueEl.value || null) : null;
+  const {error: qErr} = await sbDB.from('quotes').update({po_number: po, due_date: due}).eq('id', qid);
+  if (qErr) { toast('Save error: ' + qErr.message, 'err'); return; }
+  // Propagate to any already-dispatched shop_jobs for this quote so downstream views show the new PO/due
+  await sbDB.from('shop_jobs').update({po_number: po, due_date: due}).eq('quote_id', qid);
+  toast('Quote updated ✓', 'ok');
+  await loadPendingDispatch();
+  if (typeof loadActiveJobs === 'function') await loadActiveJobs();
+}
+
 async function releaseAllForPO(ei) {
   const entry = shopPendingData[ei];
   if (!entry) return;
@@ -3953,8 +3989,19 @@ async function loadActiveJobs() {
   _activeRows = enriched;
 
   panel.innerHTML = `
+  <div id="bulk-bar" style="display:none;background:var(--surface);border:1px solid var(--amber);border-radius:6px;padding:10px 14px;margin-bottom:10px;align-items:center;gap:10px;flex-wrap:wrap;">
+    <span id="bulk-count" style="font-family:var(--font);font-size:12px;color:var(--amber);font-weight:500;">0 selected</span>
+    <span style="color:var(--text3);font-size:11px;">→ Move to:</span>
+    <select id="bulk-stage-select" style="font-size:12px;padding:4px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;color:var(--text);">
+      ${ALL_STAGES.map(s=>`<option value="${s}">${s}</option>`).join('')}
+    </select>
+    <button class="dispatch-btn" style="padding:5px 14px;font-size:12px;" onclick="bulkUpdateStage()">Apply →</button>
+    <button class="btn btn-ghost btn-sm" style="font-size:11px;" onclick="clearJobSelection()">Clear</button>
+    <span style="color:var(--text3);font-size:10px;margin-left:auto;">SHIPPED also writes a checkout so the job leaves the floor.</span>
+  </div>
   <table class="jobs-table">
     <thead><tr>
+      <th style="width:24px;padding:4px;"><input type="checkbox" id="job-select-all" onclick="toggleSelectAllJobs(this.checked)" style="cursor:pointer;"></th>
       ${thBtn('PO #','po_number')}
       ${thBtn('Customer','customer')}
       ${thBtn('Det #','detail_number')}
@@ -3972,6 +4019,7 @@ async function loadActiveJobs() {
         const wonLabel = job.won_at ? (() => { const d=new Date(job.won_at); return `${d.getMonth()+1}/${d.getDate()}`; })() : '—';
         const stageOpts = ALL_STAGES.map(s=>`<option value="${s}"${s===job.stage?' selected':''}>${s}</option>`).join('');
         return `<tr id="jobrow-${job.id}">
+          <td style="text-align:center;padding:4px;"><input type="checkbox" class="job-select" data-job-id="${job.id}" data-po="${esc(job.po_number||'')}" data-det="${esc(job.detail_number||'')}" onclick="onJobCheckboxChange()" style="cursor:pointer;"></td>
           <td style="font-family:var(--font);color:var(--amber);white-space:nowrap;">${esc(job.po_number)}</td>
           <td style="font-size:12px;">${esc(job.customer)}</td>
           <td style="font-family:var(--font);font-size:12px;white-space:nowrap;">Det. ${esc(job.detail_number)}</td>
@@ -3998,18 +4046,87 @@ async function updateJobStage(jobId, newStation) {
   // Get the job details first so we can populate required event fields
   const { data: job } = await sbDB.from('shop_jobs').select('po_number,detail_number').eq('id', jobId).single();
   const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
-  const { error } = await sbDB.from('shop_events').insert({
+  const baseRec = {
     shop_job_id:     jobId,
     po_number:       job?.po_number || null,
     detail_number:   job?.detail_number || null,
     station:         newStation,
     tablet_station:  newStation,
-    event_type:      'checkin',
     operator_initials: initials,
-    notes:           'Stage updated from office'
-  });
+  };
+  // SHIPPED is terminal: write both checkin AND checkout so the job leaves the floor
+  // (matches the shop floor app's one-scan SHIPPED behavior)
+  const rows = newStation === 'SHIPPED'
+    ? [{...baseRec, event_type: 'checkin', notes: 'Stage updated from office'}, {...baseRec, event_type: 'checkout', notes: null}]
+    : [{...baseRec, event_type: 'checkin', notes: 'Stage updated from office'}];
+  const { error } = await sbDB.from('shop_events').insert(rows);
   if (error) { toast('Stage update error: ' + error.message, 'err'); await loadActiveJobs(); return; }
   toast(`Moved to ${newStation} ✓`, 'ok');
+  await loadActiveJobs();
+}
+
+// ── Bulk stage update ──
+function onJobCheckboxChange() {
+  const checked = document.querySelectorAll('.job-select:checked').length;
+  const bar = document.getElementById('bulk-bar');
+  if (bar) bar.style.display = checked ? 'flex' : 'none';
+  const countEl = document.getElementById('bulk-count');
+  if (countEl) countEl.textContent = `${checked} selected`;
+  // Update master select-all checkbox state
+  const all = document.querySelectorAll('.job-select');
+  const master = document.getElementById('job-select-all');
+  if (master) {
+    if (checked === 0) { master.checked = false; master.indeterminate = false; }
+    else if (checked === all.length) { master.checked = true; master.indeterminate = false; }
+    else { master.indeterminate = true; }
+  }
+}
+
+function toggleSelectAllJobs(checked) {
+  // Only select visible rows (respect any active filter)
+  const rows = document.querySelectorAll('#shop-active-list tr');
+  rows.forEach(r => {
+    if (r.style.display === 'none') return;
+    const cb = r.querySelector('.job-select');
+    if (cb) cb.checked = !!checked;
+  });
+  onJobCheckboxChange();
+}
+
+function clearJobSelection() {
+  document.querySelectorAll('.job-select').forEach(cb => cb.checked = false);
+  const master = document.getElementById('job-select-all');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  onJobCheckboxChange();
+}
+
+async function bulkUpdateStage() {
+  const checkboxes = document.querySelectorAll('.job-select:checked');
+  if (!checkboxes.length) { toast('No jobs selected', 'err'); return; }
+  const stage = document.getElementById('bulk-stage-select').value;
+  if (!stage) { toast('Pick a stage', 'err'); return; }
+  const count = checkboxes.length;
+  if (!confirm(`Move ${count} job${count!==1?'s':''} to ${stage}?${stage==='SHIPPED'?'\n\nSHIPPED will write both checkin+checkout — the jobs leave the floor.':''}`)) return;
+
+  const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
+  const note = `Bulk stage update from office (${count} jobs → ${stage})`;
+  const events = [];
+  Array.from(checkboxes).forEach(cb => {
+    const base = {
+      shop_job_id:     cb.dataset.jobId,
+      po_number:       cb.dataset.po || null,
+      detail_number:   cb.dataset.det || null,
+      station:         stage,
+      tablet_station:  stage,
+      operator_initials: initials,
+    };
+    events.push({...base, event_type: 'checkin', notes: note});
+    if (stage === 'SHIPPED') events.push({...base, event_type: 'checkout', notes: null});
+  });
+
+  const { error } = await sbDB.from('shop_events').insert(events);
+  if (error) { toast('Bulk update error: ' + error.message, 'err'); return; }
+  toast(`✓ ${count} job${count!==1?'s':''} → ${stage}`, 'ok');
   await loadActiveJobs();
 }
 
