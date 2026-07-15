@@ -2928,6 +2928,7 @@ async function parsePdfBOM(file) {
     'Rules:',
     '- STEEL GAUGE TO THICKNESS: When a drawing calls out steel by gauge or fractional thickness, map correctly: 1/8" steel = 11 gauge (0.120") — never output "1/8" as a thickness value, always convert to "11ga". Full gauge map: 7ga=0.179", 8ga=0.164", 9ga=0.150", 10ga=0.135", 11ga=0.120", 12ga=0.105", 13ga=0.090", 14ga=0.075", 16ga=0.060", 18ga=0.048", 20ga=0.036". Thicknesses 3/16" and above are plate — output as fractional string e.g. "3/16", "1/4".',
     '- Dimensions in brackets like [4.5] = inches. Unbracketed = mm unless labeled in or with inch symbol',
+    '- CRITICAL: For CROSS-SECTION dims (dim1, dim2, wall, angleLeg1, angleLeg2, angleThick, cDepth, cFlange, cWall, and thickness on flats without a gauge), if the value is METRIC, INCLUDE the "mm" suffix directly in the value string. Example: a 50×50×2mm tube → dim1:"50mm", dim2:"50mm", wall:"2mm". These fields have NO separate unit field (unlike tubeLength which does), so the unit MUST be in the value string. Bare numbers are treated as inches by the app. Never strip the "mm" — the app parses it correctly. Inch values stay bare or as fractions (e.g. "2", "1/4", "1-1/2").',
     '- Ignore holes, burn templates, machining-only items, weld symbols',
     '- Fractional inches like 1/4, 5/8 stay as strings "1/4", "5/8"',
     '- If a line cannot be parsed, include it with error:"LINE NOT READ: reason" and empty dims',
