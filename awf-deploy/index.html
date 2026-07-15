@@ -1023,18 +1023,31 @@ const CONFIG={materialRate:2.25,tubeMaterialRate:2.20,angleMaterialRate:2.20,fla
 function parseFraction(str){
   if(str===null||str===undefined||str==='') return null;
   str=String(str).trim();
-  const ga=str.match(/^(\d+)\s*ga$/i);
+  // Detect explicit unit suffix ("50mm", "2cm", "3/4 in", "1/2\""). Result is always in inches.
+  let unitMult=1, stripped=str;
+  const mmM=str.match(/^(.+?)\s*mm$/i);
+  const cmM=!mmM&&str.match(/^(.+?)\s*cm$/i);
+  const inM=!mmM&&!cmM&&str.match(/^(.+?)\s*(?:in|")$/i);
+  if(mmM){stripped=mmM[1].trim();unitMult=1/25.4;}
+  else if(cmM){stripped=cmM[1].trim();unitMult=10/25.4;}
+  else if(inM){stripped=inM[1].trim();}
+  const ga=stripped.match(/^(\d+)\s*ga$/i);
   if(ga){const g=GAUGE_TABLE[parseInt(ga[1])];return g?g[0]:null;}
-  const mixed=str.match(/^(\d+)[- ](\d+)\/(\d+)$/);
-  if(mixed) return +mixed[1]+(+mixed[2]/+mixed[3]);
-  const frac=str.match(/^(\d+)\/(\d+)$/);
-  if(frac) return +frac[1]/+frac[2];
-  const n=parseFloat(str);
-  return isNaN(n)?null:n;
+  const mixed=stripped.match(/^(\d+)[- ](\d+)\/(\d+)$/);
+  if(mixed) return (+mixed[1]+(+mixed[2]/+mixed[3]))*unitMult;
+  const frac=stripped.match(/^(\d+)\/(\d+)$/);
+  if(frac) return (+frac[1]/+frac[2])*unitMult;
+  const n=parseFloat(stripped);
+  return isNaN(n)?null:(n*unitMult);
 }
 function resolveLength(val,unit){
-  const n=parseFraction(val);
+  if(val===null||val===undefined||val==='') return null;
+  const s=String(val).trim();
+  // If the string carries an explicit unit suffix, parseFraction already converted to inches — don't apply the toggle-unit conversion again
+  const hasExplicit=/(?:^|\s|\d)(?:mm|cm|in|")$/i.test(s);
+  const n=parseFraction(s);
   if(n===null) return null;
+  if(hasExplicit) return n;
   return unit==='mm'?n/25.4:n;
 }
 function hrsLookup(thickVal){
@@ -1085,9 +1098,9 @@ function calcWeightOnly(item){
   }
   if(item.type==='tube'){
     const tt=item.tubeType||'square';
-    const h=parseFloat(item.dim1),w=tt==='round'?null:parseFloat(item.dim2),wall=parseFloat(item.wall);
+    const h=parseFraction(item.dim1),w=tt==='round'?null:parseFraction(item.dim2),wall=parseFraction(item.wall);
     const l=resolveLength(item.tubeLength,item.tubeLengthUnit||'mm');
-    if(isNaN(h)||isNaN(wall)||l===null) return 0;
+    if(h===null||wall===null||l===null) return 0;
     const lookup=tubeLookup(tt,h,w||h,wall);
     if(!lookup) return 0;
     return lookup.wt*(l/12);
