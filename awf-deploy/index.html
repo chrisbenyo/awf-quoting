@@ -440,6 +440,7 @@ table.bom select option{background:var(--surface2);}
         <button class="filter-tab" onclick="setFilter('rejected',this)">Rejected</button>
         <button class="filter-tab" onclick="setFilter('sent',this)">Sent</button>
         <button class="filter-tab" onclick="setFilter('won',this)" style="color:var(--green)">Won</button>
+        <button class="filter-tab" onclick="setFilter('trash',this)" style="color:var(--red)">🗑 Trash</button>
       </div>
     </div>
     <div class="quote-list" id="quote-list" style="flex:1;overflow-y:auto;padding-bottom:28px;"></div>
@@ -1472,15 +1473,24 @@ let currentSortOrder='updated_at.desc';
 async function setSortOrder(val){ currentSortOrder=val; loadQuotes(); }
 async function loadQuotes(){
   const[col,dir]=currentSortOrder.split('.');
-  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,created_at,user_id,review_note,submitted_at,won,po_number,due_date,won_at').order(col,{ascending:dir==='asc',nullsFirst:false});
+  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,created_at,user_id,review_note,submitted_at,won,po_number,due_date,won_at,deleted_at').order(col,{ascending:dir==='asc',nullsFirst:false});
   if(filterStatus==='won') q=q.eq('won',true);
+  else if(filterStatus==='trash'){/* no server filter — handled client-side */}
   else if(filterStatus!=='all') {
     q=q.eq('status',filterStatus);
     if(filterStatus==='sent') q=q.eq('won',false);
   }
   const{data,error}=await q;
   if(error){toast('Error loading quotes','err');return;}
-  quotes=data||[];
+  const thirtyDaysAgo=Date.now()-30*24*3600*1000;
+  if(filterStatus==='trash'){
+    // Only deleted quotes within 30-day retention; sort newest-deleted first
+    quotes=(data||[]).filter(x=>x.deleted_at && new Date(x.deleted_at).getTime()>thirtyDaysAgo)
+      .sort((a,b)=>new Date(b.deleted_at)-new Date(a.deleted_at));
+  } else {
+    // Hide deleted from all normal views
+    quotes=(data||[]).filter(x=>!x.deleted_at);
+  }
   renderSidebar();
 }
 function renderSidebar(){
@@ -1496,7 +1506,33 @@ function renderSidebar(){
     });
   }
   if(!filtered.length){
-    list.innerHTML=`<div style="padding:14px 10px;font-size:12px;color:var(--text3)">${term?'No matching quotes.':'No quotes yet.'}</div>`;
+    const empty = filterStatus==='trash'
+      ? 'Trash is empty. Deleted quotes appear here for 30 days.'
+      : (term?'No matching quotes.':'No quotes yet.');
+    list.innerHTML=`<div style="padding:14px 10px;font-size:12px;color:var(--text3)">${empty}</div>`;
+    return;
+  }
+  // Trash mode: inline Restore / Delete Forever, no click-to-open
+  if(filterStatus==='trash'){
+    list.innerHTML=filtered.map(q=>{
+      const delAt=new Date(q.deleted_at);
+      const days=Math.floor((Date.now()-delAt.getTime())/86400000);
+      const ago=days===0?'today':days===1?'yesterday':`${days} days ago`;
+      const left=Math.max(0,30-days);
+      return`
+      <div class="quote-item" style="border-color:var(--red-dim);background:rgba(239,68,68,0.04);cursor:default;">
+        <div class="qi-num">#${q.number}${q.customer_quote_num?` <span style="font-size:9px;color:var(--text3)">${q.customer_quote_num}</span>`:''}${q.po_number?` <span style="font-size:9px;color:var(--text3);font-family:var(--font)">${q.po_number}</span>`:''}</div>
+        <div class="qi-customer">${q.customer_name||'No customer'}</div>
+        <div class="qi-meta">
+          <span style="color:var(--red);">Deleted ${ago}</span>
+          <span>${fmt(q.total_price||0)}</span>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);">
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;border-color:var(--teal);color:var(--teal);padding:4px 6px;" onclick="restoreQuote('${q.id}')">↶ Restore</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1;font-size:11px;border-color:var(--red);color:var(--red);padding:4px 6px;" onclick="permanentlyDeleteQuote('${q.id}')">✕ Delete Forever</button>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:4px;text-align:right;">Auto-purge in ${left}d</div>
+      </div>`}).join('');
     return;
   }
   list.innerHTML=filtered.map(q=>{
@@ -2363,11 +2399,30 @@ async function adminDecision(newStatus){
   await openQuote(currentQuoteId);
 }
 async function deleteQuote(){
-  if(!confirm('Delete this quote? Cannot be undone.')) return;
-  await sbDB.from('quotes').delete().eq('id',currentQuoteId);
+  if(!confirm('Move this quote to Trash? You can restore it within 30 days.')) return;
+  const {error}=await sbDB.from('quotes').update({deleted_at:new Date().toISOString()}).eq('id',currentQuoteId);
+  if(error){toast('Delete error: '+error.message,'err');return;}
   quotes=quotes.filter(q=>q.id!==currentQuoteId);currentQuoteId=null;details=[];quoteLevelItems=[];
   renderSidebar();
   document.getElementById('main-content').innerHTML='<div class="empty-state"><div class="empty-icon">📋</div><h2>No quote selected</h2></div>';
+  toast('Moved to Trash — restore within 30 days','ok');
+}
+async function restoreQuote(id){
+  if(!confirm('Restore this quote from Trash?')) return;
+  const {error}=await sbDB.from('quotes').update({deleted_at:null}).eq('id',id);
+  if(error){toast('Restore error: '+error.message,'err');return;}
+  toast('Quote restored ✓','ok');
+  await loadQuotes();
+}
+async function permanentlyDeleteQuote(id){
+  if(!confirm('PERMANENTLY delete this quote and its line items? This cannot be undone.')) return;
+  // Cascade: line_items first, then the quote (fixes the previous orphan-line_items bug)
+  const {error:liErr}=await sbDB.from('line_items').delete().eq('quote_id',id);
+  if(liErr){toast('Line-items delete error: '+liErr.message,'err');return;}
+  const {error:qErr}=await sbDB.from('quotes').delete().eq('id',id);
+  if(qErr){toast('Quote delete error: '+qErr.message,'err');return;}
+  toast('Permanently deleted','ok');
+  await loadQuotes();
 }
 
 // ============================================================
