@@ -1562,6 +1562,11 @@ async function setFilter(f,el){
 // OPEN / NEW QUOTE
 // ============================================================
 async function openQuote(id){
+  // Flush any pending autosave for the quote we're LEAVING before switching.
+  // Without this, a debounced save scheduled against the old quote fires after
+  // currentQuoteId changes and overwrites the newly-opened quote.
+  clearTimeout(saveHeaderTimer);clearTimeout(saveItemsTimer);
+  if(currentQuoteId&&currentQuoteId!==id){await saveHeader();await saveItems();}
   currentQuoteId=id;
   // Always fetch fresh from DB to get all columns including new ones
   const{data:freshQ}=await sbDB.from('quotes').select('*').eq('id',id).single();
@@ -1608,6 +1613,9 @@ async function openQuote(id){
   renderSidebar();
 }
 async function newQuote(){
+  // Flush pending autosave for the currently-open quote before creating a new one.
+  clearTimeout(saveHeaderTimer);clearTimeout(saveItemsTimer);
+  if(currentQuoteId){await saveHeader();await saveItems();}
   const{data,error}=await sbDB.from('quotes').insert({user_id:currentProfile.id,status:'draft'}).select().single();
   if(error){toast('Could not create quote','err');return;}
   quotes.unshift(data);
@@ -2267,10 +2275,14 @@ function schedSave(itemsChanged=false){
   clearTimeout(saveHeaderTimer);
   clearTimeout(saveItemsTimer);
   const el=document.getElementById('save-status');if(el) el.textContent='Unsaved…';
+  // Bind this save to the quote open RIGHT NOW. If the user switches quotes
+  // before the timer fires, the guard cancels this stale save so it can never
+  // write one quote's edits onto another. (Fixes cross-quote overwrite.)
+  const qid=currentQuoteId;
   // Header always saves at 800ms
-  saveHeaderTimer=setTimeout(saveHeader,800);
+  saveHeaderTimer=setTimeout(()=>{if(currentQuoteId===qid)saveHeader();},800);
   // Items always save at 1.5s — never skip, prevent data loss on refresh
-  saveItemsTimer=setTimeout(saveItems,1500);
+  saveItemsTimer=setTimeout(()=>{if(currentQuoteId===qid)saveItems();},1500);
 }
 function buildHeaderPatch(){
   const total=calcGrandTotal();
@@ -2400,6 +2412,7 @@ async function adminDecision(newStatus){
 }
 async function deleteQuote(){
   if(!confirm('Move this quote to Trash? You can restore it within 30 days.')) return;
+  clearTimeout(saveHeaderTimer);clearTimeout(saveItemsTimer);
   const {error}=await sbDB.from('quotes').update({deleted_at:new Date().toISOString()}).eq('id',currentQuoteId);
   if(error){toast('Delete error: '+error.message,'err');return;}
   quotes=quotes.filter(q=>q.id!==currentQuoteId);currentQuoteId=null;details=[];quoteLevelItems=[];
