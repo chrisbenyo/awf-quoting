@@ -563,7 +563,13 @@ table.bom select option{background:var(--surface2);}
       <button class="btn btn-ghost btn-sm" onclick="closePricingDash()">✕ Close</button>
     </div>
     <div style="padding:16px 18px;overflow-y:auto;max-height:calc(85vh - 60px);">
-      <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Current Rates — $/lb</div>
+      <div class="pr-tabs" style="display:flex;gap:6px;margin-bottom:12px;">
+        <button type="button" class="pr-tab" data-mat="A36" onclick="switchPriceTab('A36')" style="flex:1;padding:7px 4px;font-size:12px;font-family:var(--font);border:1px solid var(--teal);background:var(--teal);color:#fff;border-radius:5px;cursor:pointer;">A36 Steel</button>
+        <button type="button" class="pr-tab" data-mat="SS" onclick="switchPriceTab('SS')" style="flex:1;padding:7px 4px;font-size:12px;font-family:var(--font);border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:5px;cursor:pointer;">Stainless (304)</button>
+        <button type="button" class="pr-tab" data-mat="AL" onclick="switchPriceTab('AL')" style="flex:1;padding:7px 4px;font-size:12px;font-family:var(--font);border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:5px;cursor:pointer;">Aluminum (6061)</button>
+      </div>
+      <div id="pr-tab-hint" style="font-size:11px;color:var(--amber);font-family:var(--font);margin-bottom:8px;min-height:14px;"></div>
+      <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Current Rates — <span id="pr-rates-mat">A36</span> $/lb</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
         <div>
           <label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em;">Flat / Plate</label>
@@ -1017,6 +1023,22 @@ function cChannelLookup(depth,flange,wall){
 const ANGLE=[[0.75,0.75,0.125,0.59],[1.0,1.0,0.125,0.80],[1.0,1.0,0.1875,1.16],[1.0,1.0,0.25,1.49],[1.25,1.25,0.125,1.01],[1.25,1.25,0.1875,1.48],[1.25,1.25,0.25,1.92],[1.5,1.5,0.125,1.23],[1.5,1.5,0.1875,1.80],[1.5,1.5,0.25,2.34],[1.5,1.5,0.3125,2.86],[2.0,2.0,0.125,1.65],[2.0,2.0,0.1875,2.44],[2.0,2.0,0.25,3.19],[2.0,2.0,0.3125,3.92],[2.0,2.0,0.375,4.70],[2.5,2.5,0.1875,3.07],[2.5,2.5,0.25,4.10],[2.5,2.5,0.3125,5.00],[2.5,2.5,0.375,5.90],[2.5,2.5,0.5,7.70],[3.0,3.0,0.1875,3.71],[3.0,3.0,0.25,4.90],[3.0,3.0,0.3125,6.10],[3.0,3.0,0.375,7.20],[3.0,3.0,0.5,9.40],[3.5,3.5,0.25,5.80],[3.5,3.5,0.3125,7.20],[3.5,3.5,0.375,8.50],[3.5,3.5,0.5,11.1],[4.0,4.0,0.25,6.60],[4.0,4.0,0.3125,8.20],[4.0,4.0,0.375,9.80],[4.0,4.0,0.5,12.8],[4.0,4.0,0.625,15.7],[4.0,4.0,0.75,18.5],[5.0,5.0,0.3125,10.3],[5.0,5.0,0.375,12.3],[5.0,5.0,0.5,16.2],[5.0,5.0,0.625,20.0],[6.0,6.0,0.375,14.9],[6.0,6.0,0.5,19.6],[6.0,6.0,0.625,24.2],[6.0,6.0,0.75,28.7],[6.0,6.0,1.0,37.4],[2.0,1.5,0.1875,2.12],[2.0,1.5,0.25,2.77],[2.5,2.0,0.1875,2.75],[2.5,2.0,0.25,3.62],[2.5,2.0,0.375,5.30],[3.0,2.0,0.25,4.10],[3.0,2.0,0.3125,5.10],[3.0,2.0,0.375,6.10],[3.0,2.5,0.25,4.50],[3.0,2.5,0.3125,5.60],[3.0,2.5,0.375,6.60],[3.5,2.5,0.25,5.10],[3.5,2.5,0.375,7.40],[4.0,3.0,0.25,5.80],[4.0,3.0,0.3125,7.20],[4.0,3.0,0.375,8.50],[4.0,3.0,0.5,11.1],[5.0,3.0,0.25,6.60],[5.0,3.0,0.375,9.80],[5.0,4.0,0.375,11.0],[5.0,4.0,0.5,14.6],[6.0,4.0,0.375,12.3],[6.0,4.0,0.5,16.2],[6.0,4.0,0.75,23.6]];
 
 const CONFIG={materialRate:2.25,tubeMaterialRate:2.20,angleMaterialRate:2.20,flatMinPrice:13.00,tubeMinPrice:5.00,angleMinPrice:5.00,roundTubePromptOD:2.0};
+// ---- Materials (A36 steel / 304 stainless / 6061 aluminum) ----
+const MATERIAL_SHORT={A36:'A36',SS:'Stainless',AL:'Aluminum'};
+const DENSITY_FACTOR={A36:1.0,SS:1.02,AL:0.344};   // weight = steel-table weight x factor
+const RATES={A36:{flat:null,tube:null,angle:null,channel:null},SS:{flat:null,tube:null,angle:null,channel:null},AL:{flat:null,tube:null,angle:null,channel:null}};
+function densityFor(m){return DENSITY_FACTOR[m]!=null?DENSITY_FACTOR[m]:1.0;}
+function rateFor(m,kind){const r=RATES[m];if(!r)return null;const v=r[kind];return (v!=null&&!isNaN(v))?+v:null;}
+let activePriceTab='A36';
+function switchPriceTab(mat){
+  activePriceTab=mat;
+  document.querySelectorAll('.pr-tab').forEach(b=>{const on=b.dataset.mat===mat;b.style.background=on?'var(--teal)':'transparent';b.style.color=on?'#fff':'var(--text2)';b.style.borderColor=on?'var(--teal)':'var(--border)';});
+  const r=RATES[mat]||{};
+  const setv=(id,v)=>{const el=document.getElementById(id);if(el)el.value=(v!=null&&!isNaN(v))?(+v).toFixed(2):'';};
+  setv('pr-flat',r.flat);setv('pr-tube',r.tube);setv('pr-angle',r.angle);setv('pr-channel',r.channel);
+  const ms=document.getElementById('pr-rates-mat');if(ms)ms.textContent=MATERIAL_SHORT[mat]||mat;
+  const hint=document.getElementById('pr-tab-hint');if(hint)hint.textContent=(mat!=='A36'&&r.flat==null)?('No '+MATERIAL_SHORT[mat]+' rates set yet — enter the four $/lb values and Save.'):'';
+}
 
 // ============================================================
 // HELPERS
@@ -1125,14 +1147,15 @@ function calcWeightOnly(item){
   return 0;
 }
 
-function priceItem(item, frozen){
+function priceItem(item, frozen, material='A36'){
+  const dens=densityFor(material);
   // If pricing is frozen (locked quote), use the stored DB price but still show weight
   if(frozen && item.dbPrice>0 && item.manualPrice==='')
-    return{unitPrice:item.dbPrice, weightLbs:calcWeightOnly(item)||null, flags:['Saved $'], warn:false};
+    return{unitPrice:item.dbPrice, weightLbs:(calcWeightOnly(item)!=null?calcWeightOnly(item)*dens:null), flags:['Saved $'], warn:false};
   if(item.manualPrice!==''&&item.manualPrice!==null&&!isNaN(parseFloat(item.manualPrice))){
     // Manual price override — still calculate and show weight
-    const weightLbs=calcWeightOnly(item)||null;
-    return{unitPrice:parseFloat(item.manualPrice),weightLbs,flags:['Manual $'],warn:false};
+    const _bw=calcWeightOnly(item);
+    return{unitPrice:parseFloat(item.manualPrice),weightLbs:(_bw!=null?_bw*dens:null),flags:['Manual $'],warn:false};
   }
   // (manual price now handled above in priceItem with weight preserved)
   if(item.type==='flat'){
@@ -1141,8 +1164,10 @@ function priceItem(item, frozen){
     const l=resolveLength(item.length,item.lengthUnit||'in');
     if(!lkp||w===null||l===null) return{unitPrice:0,weightLbs:0,flags:['Incomplete'],warn:true};
     const sqFt=(w*l)/144;
-    const weightLbs=lkp.wtPerSqFt*sqFt;
-    let price=weightLbs*CONFIG.materialRate;
+    const weightLbs=lkp.wtPerSqFt*sqFt*dens;
+    const rate=rateFor(material,'flat');
+    if(rate==null) return{unitPrice:0,weightLbs,flags:['Set '+MATERIAL_SHORT[material]+' rate'],warn:true};
+    let price=weightLbs*rate;
     const flags=[];
     if(price<CONFIG.flatMinPrice){price=CONFIG.flatMinPrice;flags.push('Min $'+CONFIG.flatMinPrice);}
     return{unitPrice:price,weightLbs,flags,warn:false};
@@ -1156,8 +1181,10 @@ function priceItem(item, frozen){
     const lookup=tubeLookup(tt,h,w||h,wall);
     if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
     const{wt:wtPerFt,poorMatch,matchDesc}=lookup;
-    const weightLbs=wtPerFt*(lenIn/12);
-    let price=weightLbs*CONFIG.tubeMaterialRate;
+    const weightLbs=wtPerFt*(lenIn/12)*dens;
+    const rate=rateFor(material,'tube');
+    if(rate==null) return{unitPrice:0,weightLbs,flags:['Set '+MATERIAL_SHORT[material]+' rate'],warn:true};
+    let price=weightLbs*rate;
     const flags=[];
     if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
     if(price<CONFIG.tubeMinPrice){price=CONFIG.tubeMinPrice;flags.push('Min $'+CONFIG.tubeMinPrice);}
@@ -1171,8 +1198,10 @@ function priceItem(item, frozen){
     const lookup=angleLookup(leg1,leg2,thick);
     if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
     const{wt:wtPerFt,poorMatch,matchDesc}=lookup;
-    const weightLbs=wtPerFt*(lenIn/12);
-    let price=weightLbs*CONFIG.angleMaterialRate;
+    const weightLbs=wtPerFt*(lenIn/12)*dens;
+    const rate=rateFor(material,'angle');
+    if(rate==null) return{unitPrice:0,weightLbs,flags:['Set '+MATERIAL_SHORT[material]+' rate'],warn:true};
+    let price=weightLbs*rate;
     const flags=[];
     if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
     if(price<CONFIG.angleMinPrice){price=CONFIG.angleMinPrice;flags.push('Min $'+CONFIG.angleMinPrice);}
@@ -1195,8 +1224,10 @@ function priceItem(item, frozen){
       if(!lookup) return{unitPrice:0,weightLbs:0,flags:['No table match'],warn:true};
       wtPerFt=lookup.wt; poorMatch=lookup.poorMatch; matchDesc=lookup.matchDesc;
     }
-    const weightLbs=wtPerFt*(lenIn/12);
-    let price=weightLbs*(CONFIG.channelRate??CONFIG.tubeMaterialRate);
+    const weightLbs=wtPerFt*(lenIn/12)*dens;
+    const rate=rateFor(material,'channel');
+    if(rate==null) return{unitPrice:0,weightLbs,flags:['Set '+MATERIAL_SHORT[material]+' rate'],warn:true};
+    let price=weightLbs*rate;
     const flags=[];
     if(poorMatch) flags.push('⚠ Approx: '+matchDesc);
     if(price<CONFIG.tubeMinPrice){price=CONFIG.tubeMinPrice;flags.push('Min $'+CONFIG.tubeMinPrice);}
@@ -1584,7 +1615,7 @@ async function openQuote(id){
   const detailMap={};
   rawItems.forEach(row=>{
     const di=(row.item_data&&row.item_data.detail_idx!==undefined)?row.item_data.detail_idx:0;
-    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''};
+    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'};
     const d=detailMap[di];
     if(row.item_type==='detail_meta'){
       d.name=row.description||'';
@@ -1594,6 +1625,7 @@ async function openQuote(id){
       d.quantity=row.item_data.quantity||1;
       d.notes=row.item_data.notes||'';
       d.detailOverridePrice=row.item_data.detailOverridePrice||'';
+      d.material=row.item_data.material||'A36';
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
@@ -1609,7 +1641,7 @@ async function openQuote(id){
     }
   });
   details=Object.values(detailMap);
-  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''}];
+  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'}];
   activeDetailIdx=0;
   renderQuoteEditor(q);
   renderSidebar();
@@ -1621,7 +1653,7 @@ async function newQuote(){
   const{data,error}=await sbDB.from('quotes').insert({user_id:currentProfile.id,status:'draft'}).select().single();
   if(error){toast('Could not create quote','err');return;}
   quotes.unshift(data);
-  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''}];
+  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'}];
   quoteLevelItems=[];
   activeDetailIdx=0;
   currentQuoteId=data.id;
@@ -1872,7 +1904,7 @@ function renderDetailBody(locked){
   const T=calcDetailTotal(d, priceFrozen);
 
   const bomRows=d.items.map(item=>{
-    const{unitPrice,weightLbs,flags,warn}=priceItem(item, priceFrozen);
+    const{unitPrice,weightLbs,flags,warn}=priceItem(item, priceFrozen, d.material||'A36');
     const qty=parseInt(item.qty)||1;
     const tt=item.tubeType||'square',isRound=tt==='round';
     const tlu=item.tubeLengthUnit||'mm',lu=item.lengthUnit||'in',wu=item.widthUnit||'in';
@@ -1947,6 +1979,12 @@ function renderDetailBody(locked){
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
       <input value="${esc(d.name)}" placeholder="Detail name…" style="background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;font-weight:500;padding:2px 6px;outline:none;width:200px;"
         oninput="details[${activeDetailIdx}].name=this.value;renderDetailBar(${locked})" onfocus="this.style.borderBottomColor='var(--amber)'" onblur="this.style.borderBottomColor='var(--border)'">
+      <select onchange="details[${activeDetailIdx}].material=this.value;recalcDetailDisplay();renderDetailBar(${locked});schedSave()" ${locked?'disabled':''} title="Detail material — governs pricing" style="background:var(--bg);border:1px solid var(--teal);border-radius:4px;color:var(--text);font-size:13px;padding:5px 8px;font-family:var(--font);">
+        <option value="A36"${(d.material||'A36')==='A36'?' selected':''}>A36 Steel</option>
+        <option value="SS"${d.material==='SS'?' selected':''}>Stainless (304)</option>
+        <option value="AL"${d.material==='AL'?' selected':''}>Aluminum (6061)</option>
+      </select>
+      <span style="font-size:10px;color:var(--text3);font-family:var(--font);">Mixed steel + stainless → choose Stainless</span>
       ${!locked&&details.length>1?`<button class="btn btn-danger btn-sm" onclick="removeDetail(${activeDetailIdx})">Remove Detail</button>`:''}
     </div>
     <div class="bom-wrap">
@@ -2006,7 +2044,7 @@ function buildTotalsHTML(d,T){
 function calcDetailTotal(d, priceFrozen){
   let matTotal=0,totalWeight=0;
   for(const item of d.items){
-    const{unitPrice,weightLbs}=priceItem(item, priceFrozen);
+    const{unitPrice,weightLbs}=priceItem(item, priceFrozen, d.material||'A36');
     const qty=parseInt(item.qty)||1;
     matTotal+=unitPrice*qty;
     if(weightLbs!==null) totalWeight+=weightLbs*qty;
@@ -2041,7 +2079,7 @@ function recalcDetailDisplay(){
   const el=document.getElementById('detail-totals-block');
   if(el) el.innerHTML=buildTotalsHTML(d,T);
   d.items.forEach(item=>{
-    const{unitPrice,weightLbs,flags,warn}=priceItem(item);
+    const{unitPrice,weightLbs,flags,warn}=priceItem(item, false, d.material||'A36');
     const qty=parseInt(item.qty)||1;
     const uc=document.getElementById('up-'+item.id);
     const lc=document.getElementById('lt-'+item.id);
@@ -2089,7 +2127,7 @@ function openDetailOverride(idx){
 
 
 function addDetail(){
-  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:''});
+  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'});
   activeDetailIdx=details.length-1;
   renderDetailBar(false);renderDetailBody(false);saveItems();
 }
@@ -2340,9 +2378,9 @@ async function saveItems(){
   // Build all rows first, THEN delete+insert atomically
   const rows=[];let sort=0;
   details.forEach((d,di)=>{
-    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||''}});
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||'',material:d.material||'A36'}});
     d.items.forEach(item=>{
-      const{unitPrice}=priceItem(item);
+      const{unitPrice}=priceItem(item, false, d.material||'A36');
       const qty=parseInt(item.qty)||1;
       rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:item.type,description:'',qty,unit_price:unitPrice,total_price:+(unitPrice*qty).toFixed(2),source:'manual',item_data:{detail_idx:di,manualPrice:item.manualPrice,thickness:item.thickness,width:item.width,length:item.length,lengthUnit:item.lengthUnit,widthUnit:item.widthUnit,dim1:item.dim1,dim2:item.dim2,wall:item.wall,tubeLength:item.tubeLength,tubeLengthUnit:item.tubeLengthUnit,tubeType:item.tubeType,angleLeg1:item.angleLeg1,angleLeg2:item.angleLeg2,angleThick:item.angleThick,angleLength:item.angleLength,angleLengthUnit:item.angleLengthUnit,cDepth:item.cDepth,cFlange:item.cFlange,cWall:item.cWall,cLength:item.cLength,cLengthUnit:item.cLengthUnit,cLbFt:item.cLbFt||'',cUseLbFt:!!item.cUseLbFt}});
     });
@@ -2784,28 +2822,38 @@ async function confirmWon(){
 // PRICING DASHBOARD
 // ============================================================
 async function loadPricingConfig() {
-  // Current A36 rates = most recent pricing_history row (DB-backed, shop-wide, permanent).
+  // Load the latest rate row per material from pricing_history (DB-backed, shop-wide).
   try {
     const {data} = await sbDB.from('pricing_history')
-      .select('flat_rate,tube_rate,angle_rate,channel_rate')
-      .eq('material','A36').order('changed_at',{ascending:false}).limit(1);
-    const row = Array.isArray(data) ? data[0] : data;
-    if (row) {
-      if (row.flat_rate    != null) CONFIG.materialRate      = parseFloat(row.flat_rate);
-      if (row.tube_rate    != null) CONFIG.tubeMaterialRate  = parseFloat(row.tube_rate);
-      if (row.angle_rate   != null) CONFIG.angleMaterialRate = parseFloat(row.angle_rate);
-      if (row.channel_rate != null) CONFIG.channelRate       = parseFloat(row.channel_rate);
+      .select('material,flat_rate,tube_rate,angle_rate,channel_rate,changed_at')
+      .order('changed_at',{ascending:false}).limit(300);
+    const rows = data || [];
+    const seen = {};
+    for (const r of rows) {
+      const m = r.material || 'A36';
+      if (seen[m]) continue; seen[m] = true;
+      RATES[m] = {
+        flat:    r.flat_rate    != null ? +r.flat_rate    : null,
+        tube:    r.tube_rate    != null ? +r.tube_rate    : null,
+        angle:   r.angle_rate   != null ? +r.angle_rate   : null,
+        channel: r.channel_rate != null ? +r.channel_rate : null
+      };
     }
+    if (RATES.A36) {
+      if (RATES.A36.flat    != null) CONFIG.materialRate      = RATES.A36.flat;
+      if (RATES.A36.tube    != null) CONFIG.tubeMaterialRate  = RATES.A36.tube;
+      if (RATES.A36.angle   != null) CONFIG.angleMaterialRate = RATES.A36.angle;
+      if (RATES.A36.channel != null) CONFIG.channelRate       = RATES.A36.channel;
+    }
+    // A36 always has usable rates (fall back to CONFIG defaults so steel never blocks).
+    RATES.A36 = {flat:CONFIG.materialRate, tube:CONFIG.tubeMaterialRate, angle:CONFIG.angleMaterialRate, channel:(CONFIG.channelRate!=null?CONFIG.channelRate:CONFIG.tubeMaterialRate)};
   } catch(e) {}
 }
 
 async function openPricingDash() {
   if (currentProfile?.role !== 'admin') { toast('Pricing rates are admin-only','err'); return; }
   await loadPricingConfig();
-  document.getElementById('pr-flat').value    = CONFIG.materialRate.toFixed(2);
-  document.getElementById('pr-tube').value    = CONFIG.tubeMaterialRate.toFixed(2);
-  document.getElementById('pr-angle').value   = CONFIG.angleMaterialRate.toFixed(2);
-  document.getElementById('pr-channel').value = (CONFIG.channelRate ?? CONFIG.tubeMaterialRate).toFixed(2);
+  switchPriceTab('A36');
   document.getElementById('pr-note').value    = '';
   renderPricingHistory();
   document.getElementById('pricing-modal').classList.add('open');
@@ -2823,32 +2871,22 @@ async function savePricingRates() {
   const note    = document.getElementById('pr-note').value.trim();
   if ([flat,tube,angle,channel].some(isNaN)) { toast('All rates must be valid numbers','err'); return; }
 
-  const dateStr = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
-  const changes = [];
-  const oldFlat    = CONFIG.materialRate;
-  const oldTube    = CONFIG.tubeMaterialRate;
-  const oldAngle   = CONFIG.angleMaterialRate;
-  const oldChannel = CONFIG.channelRate ?? CONFIG.tubeMaterialRate;
-
-  if (flat    !== oldFlat)    changes.push(`Flat/Plate: $${oldFlat.toFixed(2)} → $${flat.toFixed(2)}`);
-  if (tube    !== oldTube)    changes.push(`Tube: $${oldTube.toFixed(2)} → $${tube.toFixed(2)}`);
-  if (angle   !== oldAngle)   changes.push(`Angle: $${oldAngle.toFixed(2)} → $${angle.toFixed(2)}`);
-  if (channel !== oldChannel) changes.push(`C Channel: $${oldChannel.toFixed(2)} → $${channel.toFixed(2)}`);
-
-  if (!changes.length) { toast('No changes to save',''); closePricingDash(); return; }
+  const _cur = RATES[activePriceTab] || {};
+  const _same = (+_cur.flat===flat)&&(+_cur.tube===tube)&&(+_cur.angle===angle)&&(+_cur.channel===channel);
+  if (_same) { toast('No changes to save',''); closePricingDash(); return; }
 
   // Persist the new rates as a new pricing_history row (admin-only, enforced by RLS).
   const {error:saveErr} = await sbDB.from('pricing_history').insert({
-    material:'A36', flat_rate:flat, tube_rate:tube, angle_rate:angle, channel_rate:channel,
+    material:activePriceTab, flat_rate:flat, tube_rate:tube, angle_rate:angle, channel_rate:channel,
     note: note||null,
     changed_by_name: currentProfile?.full_name || currentUser?.email || null
   });
   if (saveErr) { toast('Could not save rates: '+(saveErr.message||'error'),'err'); return; }
 
-  CONFIG.materialRate      = flat;
-  CONFIG.tubeMaterialRate  = tube;
-  CONFIG.angleMaterialRate = angle;
-  CONFIG.channelRate       = channel;
+  RATES[activePriceTab] = {flat, tube, angle, channel};
+  if (activePriceTab === 'A36') {
+    CONFIG.materialRate = flat; CONFIG.tubeMaterialRate = tube; CONFIG.angleMaterialRate = angle; CONFIG.channelRate = channel;
+  }
 
   toast('Pricing updated ✓','ok');
   await renderPricingHistory();
