@@ -609,6 +609,18 @@ table.bom select option{background:var(--surface2);}
         <input type="text" id="pr-note" placeholder="e.g. Raised sheet — Alro invoice 3/31" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:7px 10px;font-size:13px;font-family:var(--sans);">
       </div>
       <button class="btn btn-accent" style="width:100%;margin-bottom:20px;" onclick="savePricingRates()">Save Rates →</button>
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:20px;">
+        <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;">Shop Labor Rates — $/hr</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div><label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;">Fit</label>
+            <input type="number" id="lr-fit" step="0.01" min="0" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);"></div>
+          <div><label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;">Weld</label>
+            <input type="number" id="lr-weld" step="0.01" min="0" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);"></div>
+          <div><label style="font-size:10px;font-family:var(--font);color:var(--text2);display:block;margin-bottom:4px;text-transform:uppercase;">Labor</label>
+            <input type="number" id="lr-labor" step="0.01" min="0" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);padding:6px 8px;font-size:14px;font-family:var(--font);"></div>
+        </div>
+        <button class="btn btn-accent" style="width:100%;" onclick="saveLaborRates()">Save Labor Rates →</button>
+      </div>
       <div style="font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:8px;">Change History</div>
       <div id="pricing-history" style="font-size:12px;"></div>
     </div>
@@ -1029,6 +1041,10 @@ const DENSITY_FACTOR={A36:1.0,SS:1.02,AL:0.344};   // weight = steel-table weigh
 const RATES={A36:{flat:null,tube:null,angle:null,channel:null},SS:{flat:null,tube:null,angle:null,channel:null},AL:{flat:null,tube:null,angle:null,channel:null}};
 function densityFor(m){return DENSITY_FACTOR[m]!=null?DENSITY_FACTOR[m]:1.0;}
 function rateFor(m,kind){const r=RATES[m];if(!r)return null;const v=r[kind];return (v!=null&&!isNaN(v))?+v:null;}
+// ---- Labor (shop-default $/hr per bucket, overridable per detail) ----
+const SHOP_LABOR={fit:null,weld:null,labor:null};
+function laborRateEff(d,kind){const L=d.labor||{};const ov=L[kind+'Rate'];if(ov!==''&&ov!=null&&!isNaN(ov))return +ov;const sh=SHOP_LABOR[kind];return (sh!=null&&!isNaN(sh))?+sh:0;}
+function laborCost(d){const L=d.labor||{};const h=k=>parseFloat(L[k+'Hrs'])||0;return h('fit')*laborRateEff(d,'fit')+h('weld')*laborRateEff(d,'weld')+h('labor')*laborRateEff(d,'labor');}
 let activePriceTab='A36';
 function switchPriceTab(mat){
   activePriceTab=mat;
@@ -1615,7 +1631,7 @@ async function openQuote(id){
   const detailMap={};
   rawItems.forEach(row=>{
     const di=(row.item_data&&row.item_data.detail_idx!==undefined)?row.item_data.detail_idx:0;
-    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'};
+    if(!detailMap[di]) detailMap[di]={id:nextLocalId++,name:(row.item_data&&row.item_data.detail_name)||'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36',labor:{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}};
     const d=detailMap[di];
     if(row.item_type==='detail_meta'){
       d.name=row.description||'';
@@ -1626,6 +1642,7 @@ async function openQuote(id){
       d.notes=row.item_data.notes||'';
       d.detailOverridePrice=row.item_data.detailOverridePrice||'';
       d.material=row.item_data.material||'A36';
+      d.labor=row.item_data.labor||{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null};
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
@@ -1641,7 +1658,7 @@ async function openQuote(id){
     }
   });
   details=Object.values(detailMap);
-  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'}];
+  if(!details.length) details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36',labor:{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}}];
   activeDetailIdx=0;
   renderQuoteEditor(q);
   renderSidebar();
@@ -1653,7 +1670,7 @@ async function newQuote(){
   const{data,error}=await sbDB.from('quotes').insert({user_id:currentProfile.id,status:'draft'}).select().single();
   if(error){toast('Could not create quote','err');return;}
   quotes.unshift(data);
-  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'}];
+  details=[{id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36',labor:{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}}];
   quoteLevelItems=[];
   activeDetailIdx=0;
   currentQuoteId=data.id;
@@ -2014,6 +2031,13 @@ function renderDetailBody(locked){
       <div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">QTY OF DETAIL</label><br>
         <input type="number" value="${d.quantity||1}" min="1" style="width:70px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].quantity=this.value;recalcDetailDisplay()"></div>
     </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end;">
+      <div style="font-size:11px;color:var(--amber);font-family:var(--font);align-self:center;font-weight:600;">LABOR</div>
+      ${['fit','weld','labor'].map(k=>{const L=d.labor||{};const eff=laborRateEff(d,k);const lbl=k.charAt(0).toUpperCase()+k.slice(1);return `<div><label style="font-size:11px;color:var(--text2);font-family:var(--font);">${lbl} hrs</label><br>
+        <input type="number" min="0" step="0.25" value="${L[k+'Hrs']||0}" style="width:54px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].labor=details[${activeDetailIdx}].labor||{};details[${activeDetailIdx}].labor.${k}Hrs=this.value;recalcDetailDisplay()">
+        <span style="font-size:10px;color:var(--text3);font-family:var(--font);">@$</span>
+        <input type="number" min="0" step="0.5" value="${eff||''}" title="Rate for this quote (blank = shop rate)" style="width:50px;background:var(--bg);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:4px 6px;" oninput="details[${activeDetailIdx}].labor=details[${activeDetailIdx}].labor||{};details[${activeDetailIdx}].labor.${k}Rate=this.value;recalcDetailDisplay()"></div>`;}).join('')}
+    </div>
     ${d.otherItems.length||!locked?`<div class="bom-wrap"><table class="bom"><thead><tr><th>Other items</th><th style="width:48px">Qty</th><th style="width:82px">Unit $</th><th class="price-cell">Total</th><th style="width:26px"></th></tr></thead><tbody>${otherRows}</tbody></table></div>
     ${locked?'':` <div class="row-btns"><button class="add-item-btn" onclick="addOtherItem()">+ Freeform Item</button></div>`}`:''}
     <div class="detail-totals" id="detail-totals-block">${buildTotalsHTML(d,T)}</div>`;
@@ -2031,6 +2055,7 @@ function buildTotalsHTML(d,T){
     <div class="total-item"><div class="total-item-label">Miters (${d.miters||0})</div><div class="total-item-value">${fmt(T.miterCost)}</div></div>
     <div class="total-item"><div class="total-item-label">Holes (${d.holes||0})</div><div class="total-item-value">${fmt(T.holeCost)}</div></div>
     <div class="total-item"><div class="total-item-label">Other</div><div class="total-item-value">${fmt(T.otherTotal)}</div></div>
+    <div class="total-item"><div class="total-item-label">Labor</div><div class="total-item-value">${fmt(T.laborTotal||0)}</div></div>
     <div class="total-item"><div class="total-item-label">Subtotal</div><div class="total-item-value${T.overrideActive?' override-struck':''}"><span style="${T.overrideActive?'text-decoration:line-through;opacity:.45;':''}">${fmt(T.adjusted)}</span></div></div>
     ${overrideRow}
     <div class="total-item"><div class="total-item-label">× ${T.qty} Detail(s)</div><div class="total-item-value big">${fmt(T.total)}</div></div>
@@ -2053,7 +2078,8 @@ function calcDetailTotal(d, priceFrozen){
   const holeCost=(parseInt(d.holes)||0)*15;
   let otherTotal=0;
   for(const o of d.otherItems) otherTotal+=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
-  const subtotal=matTotal+miterCost+holeCost+otherTotal;
+  const laborTotal=laborCost(d);
+  const subtotal=matTotal+miterCost+holeCost+otherTotal+laborTotal;
   const adj=parseFloat(d.adjustment)||0;
   const adjusted=subtotal*(1+adj/100);
   const qty=parseInt(d.quantity)||1;
@@ -2061,7 +2087,7 @@ function calcDetailTotal(d, priceFrozen){
   const overrideVal=parseFloat(d.detailOverridePrice);
   const overrideActive=d.detailOverridePrice!==''&&!isNaN(overrideVal);
   const finalUnit=overrideActive?overrideVal:adjusted;
-  return{matTotal,miterCost,holeCost,otherTotal,subtotal,adjusted,total:finalUnit*qty,qty,totalWeight,overrideActive,overrideVal:overrideActive?overrideVal:null};
+  return{matTotal,miterCost,holeCost,otherTotal,laborTotal,subtotal,adjusted,total:finalUnit*qty,qty,totalWeight,overrideActive,overrideVal:overrideActive?overrideVal:null};
 }
 function calcGrandTotal(){
   let t=0;
@@ -2127,7 +2153,7 @@ function openDetailOverride(idx){
 
 
 function addDetail(){
-  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36'});
+  details.push({id:nextLocalId++,name:'',items:[],otherItems:[],miters:0,holes:0,adjustment:0,quantity:1,notes:'',detailOverridePrice:'',material:'A36',labor:{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}});
   activeDetailIdx=details.length-1;
   renderDetailBar(false);renderDetailBody(false);saveItems();
 }
@@ -2378,7 +2404,7 @@ async function saveItems(){
   // Build all rows first, THEN delete+insert atomically
   const rows=[];let sort=0;
   details.forEach((d,di)=>{
-    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||'',material:d.material||'A36'}});
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||'',material:d.material||'A36',labor:d.labor||{}}});
     d.items.forEach(item=>{
       const{unitPrice}=priceItem(item, false, d.material||'A36');
       const qty=parseInt(item.qty)||1;
@@ -2847,6 +2873,14 @@ async function loadPricingConfig() {
     }
     // A36 always has usable rates (fall back to CONFIG defaults so steel never blocks).
     RATES.A36 = {flat:CONFIG.materialRate, tube:CONFIG.tubeMaterialRate, angle:CONFIG.angleMaterialRate, channel:(CONFIG.channelRate!=null?CONFIG.channelRate:CONFIG.tubeMaterialRate)};
+    // Shop labor rates (latest labor_rates row)
+    const {data:lr} = await sbDB.from('labor_rates').select('fit_rate,weld_rate,labor_rate,changed_at').order('changed_at',{ascending:false}).limit(1);
+    const lrow = Array.isArray(lr) ? lr[0] : lr;
+    if (lrow) {
+      SHOP_LABOR.fit   = lrow.fit_rate   != null ? +lrow.fit_rate   : null;
+      SHOP_LABOR.weld  = lrow.weld_rate  != null ? +lrow.weld_rate  : null;
+      SHOP_LABOR.labor = lrow.labor_rate != null ? +lrow.labor_rate : null;
+    }
   } catch(e) {}
 }
 
@@ -2854,6 +2888,10 @@ async function openPricingDash() {
   if (currentProfile?.role !== 'admin') { toast('Pricing rates are admin-only','err'); return; }
   await loadPricingConfig();
   switchPriceTab('A36');
+  { const _lf=document.getElementById('lr-fit'),_lw=document.getElementById('lr-weld'),_ll=document.getElementById('lr-labor');
+    if(_lf)_lf.value=SHOP_LABOR.fit!=null?SHOP_LABOR.fit:'';
+    if(_lw)_lw.value=SHOP_LABOR.weld!=null?SHOP_LABOR.weld:'';
+    if(_ll)_ll.value=SHOP_LABOR.labor!=null?SHOP_LABOR.labor:''; }
   document.getElementById('pr-note').value    = '';
   renderPricingHistory();
   document.getElementById('pricing-modal').classList.add('open');
@@ -2891,6 +2929,19 @@ async function savePricingRates() {
   toast('Pricing updated ✓','ok');
   await renderPricingHistory();
   document.getElementById('pr-note').value = '';
+  if (currentQuoteId) recalcDetailDisplay();
+}
+
+async function saveLaborRates(){
+  if (currentProfile?.role !== 'admin') { toast('Labor rates are admin-only','err'); return; }
+  const fit=parseFloat(document.getElementById('lr-fit').value);
+  const weld=parseFloat(document.getElementById('lr-weld').value);
+  const labor=parseFloat(document.getElementById('lr-labor').value);
+  if([fit,weld,labor].some(isNaN)){ toast('All labor rates must be valid numbers','err'); return; }
+  const {error} = await sbDB.from('labor_rates').insert({fit_rate:fit,weld_rate:weld,labor_rate:labor,changed_by_name:currentProfile?.full_name||currentUser?.email||null});
+  if(error){ toast('Could not save labor rates: '+(error.message||'error'),'err'); return; }
+  SHOP_LABOR.fit=fit; SHOP_LABOR.weld=weld; SHOP_LABOR.labor=labor;
+  toast('Labor rates updated \u2713','ok');
   if (currentQuoteId) recalcDetailDisplay();
 }
 
