@@ -407,7 +407,7 @@ table.bom select option{background:var(--surface2);}
       <span class="save-status" id="save-status"></span>
       <button class="btn btn-ghost btn-sm" id="shop-nav-btn" onclick="openShopScreen()" style="display:none;border-color:var(--teal);color:var(--teal);">🏭 Shop</button>
       <a class="btn btn-ghost btn-sm" href="customers.html" style="text-decoration:none;display:inline-flex;align-items:center;">📊 Customers</a>
-      <button class="btn btn-ghost btn-sm" onclick="openPricingDash()">⚙ Pricing</button>
+      <button class="btn btn-ghost btn-sm" id="pricing-nav-btn" onclick="openPricingDash()" style="display:none;">⚙ Pricing</button>
       <button class="btn btn-ghost btn-sm" onclick="showChangePassword()">Password</button>
       <button class="btn btn-ghost btn-sm" onclick="signOut()">Sign out</button>
     </div>
@@ -1297,6 +1297,8 @@ function showApp(){
   rb.className='role-badge role-'+(currentProfile?.role||'estimator');
   if(currentProfile?.role==='admin') document.getElementById('filter-tabs').style.display='flex';
   if(currentProfile?.role==='admin') document.getElementById('shop-nav-btn').style.display='inline-flex';
+  if(currentProfile?.role==='admin') document.getElementById('pricing-nav-btn').style.display='inline-flex';
+  loadPricingConfig();
   loadQuotes().then(_applyCustomerFilterFromUrl);
   // Keepalive removed — sessionStorage handles per-tab sessions cleanly
 }
@@ -2781,20 +2783,25 @@ async function confirmWon(){
 // ============================================================
 // PRICING DASHBOARD
 // ============================================================
-function loadPricingConfig() {
+async function loadPricingConfig() {
+  // Current A36 rates = most recent pricing_history row (DB-backed, shop-wide, permanent).
   try {
-    const stored = JSON.parse(localStorage.getItem('awf_pricing_v1') || 'null');
-    if (stored) {
-      CONFIG.materialRate      = stored.flat    ?? CONFIG.materialRate;
-      CONFIG.tubeMaterialRate  = stored.tube    ?? CONFIG.tubeMaterialRate;
-      CONFIG.angleMaterialRate = stored.angle   ?? CONFIG.angleMaterialRate;
-      CONFIG.channelRate       = stored.channel ?? CONFIG.tubeMaterialRate;
+    const {data} = await sbDB.from('pricing_history')
+      .select('flat_rate,tube_rate,angle_rate,channel_rate')
+      .eq('material','A36').order('changed_at',{ascending:false}).limit(1);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row) {
+      if (row.flat_rate    != null) CONFIG.materialRate      = parseFloat(row.flat_rate);
+      if (row.tube_rate    != null) CONFIG.tubeMaterialRate  = parseFloat(row.tube_rate);
+      if (row.angle_rate   != null) CONFIG.angleMaterialRate = parseFloat(row.angle_rate);
+      if (row.channel_rate != null) CONFIG.channelRate       = parseFloat(row.channel_rate);
     }
   } catch(e) {}
 }
 
-function openPricingDash() {
-  loadPricingConfig();
+async function openPricingDash() {
+  if (currentProfile?.role !== 'admin') { toast('Pricing rates are admin-only','err'); return; }
+  await loadPricingConfig();
   document.getElementById('pr-flat').value    = CONFIG.materialRate.toFixed(2);
   document.getElementById('pr-tube').value    = CONFIG.tubeMaterialRate.toFixed(2);
   document.getElementById('pr-angle').value   = CONFIG.angleMaterialRate.toFixed(2);
@@ -2808,7 +2815,7 @@ function closePricingDash() {
   document.getElementById('pricing-modal').classList.remove('open');
 }
 
-function savePricingRates() {
+async function savePricingRates() {
   const flat    = parseFloat(document.getElementById('pr-flat').value);
   const tube    = parseFloat(document.getElementById('pr-tube').value);
   const angle   = parseFloat(document.getElementById('pr-angle').value);
@@ -2830,46 +2837,54 @@ function savePricingRates() {
 
   if (!changes.length) { toast('No changes to save',''); closePricingDash(); return; }
 
+  // Persist the new rates as a new pricing_history row (admin-only, enforced by RLS).
+  const {error:saveErr} = await sbDB.from('pricing_history').insert({
+    material:'A36', flat_rate:flat, tube_rate:tube, angle_rate:angle, channel_rate:channel,
+    note: note||null,
+    changed_by_name: currentProfile?.full_name || currentUser?.email || null
+  });
+  if (saveErr) { toast('Could not save rates: '+(saveErr.message||'error'),'err'); return; }
+
   CONFIG.materialRate      = flat;
   CONFIG.tubeMaterialRate  = tube;
   CONFIG.angleMaterialRate = angle;
   CONFIG.channelRate       = channel;
 
-  try { localStorage.setItem('awf_pricing_v1', JSON.stringify({flat,tube,angle,channel})); } catch(e) {}
-
-  try {
-    const history = JSON.parse(localStorage.getItem('awf_pricing_history_v1') || '[]');
-    history.unshift({date:dateStr, ts:Date.now(), changes, note:note||null, by:currentProfile?.full_name||currentUser?.email||'unknown'});
-    if (history.length > 200) history.length = 200;
-    localStorage.setItem('awf_pricing_history_v1', JSON.stringify(history));
-  } catch(e) {}
-
   toast('Pricing updated ✓','ok');
-  renderPricingHistory();
+  await renderPricingHistory();
   document.getElementById('pr-note').value = '';
   if (currentQuoteId) recalcDetailDisplay();
 }
 
-function renderPricingHistory() {
+async function renderPricingHistory() {
   const el = document.getElementById('pricing-history');
   if (!el) return;
   try {
-    const history = JSON.parse(localStorage.getItem('awf_pricing_history_v1') || '[]');
-    if (!history.length) { el.innerHTML = '<div style="color:var(--text3);padding:8px 0;">No changes yet.</div>'; return; }
-    el.innerHTML = history.map(entry => `
+    const {data} = await sbDB.from('pricing_history').select('*')
+      .order('changed_at',{ascending:false}).limit(200);
+    const rows = data || [];
+    if (!rows.length) { el.innerHTML = '<div style="color:var(--text3);padding:8px 0;">No changes yet.</div>'; return; }
+    el.innerHTML = rows.map(r => {
+      const d = new Date(r.changed_at);
+      const dateStr = `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+      const by = r.changed_by_name || '—';
+      const rates = `Flat ${(+r.flat_rate).toFixed(2)} \u00b7 Tube ${(+r.tube_rate).toFixed(2)} \u00b7 Angle ${(+r.angle_rate).toFixed(2)} \u00b7 Channel ${(+r.channel_rate).toFixed(2)}`;
+      return `
       <div style="border:1px solid var(--border);border-radius:5px;padding:9px 12px;margin-bottom:7px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
-          <span style="font-family:var(--font);font-size:11px;color:var(--amber)">${entry.date}</span>
-          <span style="font-size:11px;color:var(--text3)">by ${esc(entry.by)}</span>
-          ${entry.note?`<span style="font-size:11px;color:var(--text2);margin-left:auto;font-style:italic;">${esc(entry.note)}</span>`:''}
+          <span style="font-family:var(--font);font-size:11px;color:var(--amber)">${dateStr}</span>
+          <span style="font-size:11px;color:var(--text3)">by ${esc(by)}</span>
+          ${r.material&&r.material!=='A36'?`<span style="font-size:10px;color:var(--teal)">${esc(r.material)}</span>`:''}
+          ${r.note?`<span style="font-size:11px;color:var(--text2);margin-left:auto;font-style:italic;">${esc(r.note)}</span>`:''}
         </div>
-        ${entry.changes.map(c=>`<div style="font-size:12px;color:var(--text);font-family:var(--font);margin-bottom:2px;">· ${c}</div>`).join('')}
-      </div>`).join('');
+        <div style="font-size:12px;color:var(--text);font-family:var(--font);">${rates}</div>
+      </div>`;
+    }).join('');
   } catch(e) { el.innerHTML = '<div style="color:var(--text3)">Could not load history.</div>'; }
 }
 
 // Load saved pricing on startup
-window.addEventListener('load', () => loadPricingConfig());
+// Pricing rates now load in showApp() (after auth) from the DB — see loadPricingConfig().
 
 // Close pricing modal on overlay click
 document.addEventListener('DOMContentLoaded', () => {
