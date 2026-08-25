@@ -2740,6 +2740,11 @@ async function generateOrderReport() {
             <div style="border:1px solid #000;flex:1;min-height:2.6in;padding:6px;">
               <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;">Special Notes / Sketch:</div>
             </div>
+            <!-- Quoted labor hours (this detail) -->
+            <div style="border:1px solid #000;padding:4px 6px;font-size:8pt;display:flex;justify-content:space-between;align-items:center;">
+              <span style="font-weight:bold;">Quoted Hrs</span>
+              <span>Fit ${(detail.labor&&detail.labor.fitHrs)||0} &nbsp;&middot;&nbsp; Weld ${(detail.labor&&detail.labor.weldHrs)||0} &nbsp;&middot;&nbsp; Labor ${(detail.labor&&detail.labor.laborHrs)||0}</span>
+            </div>
             <!-- Operations table -->
             <table style="border-collapse:collapse;font-size:8pt;width:100%;">
               <thead><tr>
