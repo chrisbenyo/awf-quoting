@@ -193,6 +193,8 @@ const PRIOR={4:906952,5:889274,6:1367820,7:933525,8:1035669,9:1269595,10:937617,
 const priorMonthVal=PRIOR[CUR_MONTH]||917456;
 
 function elephantAdj(v) { return v > ELEPHANT ? v * 0.5 : v; }
+// Won quotes count at 100%; only open/pipeline quotes get the elephant haircut.
+function dashVal(q){ const v=(q&&q.total_price)||0; return q.won ? v : elephantAdj(v); }
 function fmtK(n) { return '$' + Math.round(n/1000) + 'K'; }
 function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
 
@@ -371,7 +373,7 @@ async function loadLive() {
     allLive.forEach(q => {
       const d = new Date(q.created_at);
       const yr=d.getFullYear(), mo=d.getMonth();
-      const adj = elephantAdj(q.total_price||0);
+      const adj = dashVal(q);
       if (yr===CUR_YEAR && mo===CUR_MONTH) {
         aprLive += adj;
         if (q.won) aprWon += adj; else { aprOpen++; aprOpenVal += adj; }
@@ -394,7 +396,7 @@ async function loadLive() {
     (Array.isArray(allYear)?allYear:[]).forEach(q => {
       const d = new Date(q.created_at);
       const yr=d.getFullYear(), mo=d.getMonth();
-      const adj = elephantAdj(q.total_price||0);
+      const adj = dashVal(q);
       const isPostH26 = (yr > 2026) || (yr === 2026 && mo > 3);          // after Apr 2026
       const isBeforeCurrent = (yr < CUR_YEAR) || (yr === CUR_YEAR && mo < CUR_MONTH);
       if (isPostH26 && isBeforeCurrent) {
@@ -435,7 +437,7 @@ async function loadLive() {
       const day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);
       mon.setDate(d.getDate()+diff);mon.setHours(0,0,0,0);
       const k=`${mon.getMonth()+1}/${mon.getDate()}`;
-      if(k in wonByWeekMap)wonByWeekMap[k]+=elephantAdj(q.total_price||0);
+      if(k in wonByWeekMap)wonByWeekMap[k]+=dashVal(q);
     });
     const liveWeeks = Object.entries(wonByWeekMap).map(([label,v])=>({label,v}));
     buildWeeklyChart([...WKS_HIST,...liveWeeks]);
@@ -475,7 +477,7 @@ async function loadLive() {
       const d=new Date(q.won_at);
       return d.getFullYear()===CUR_YEAR && d.getMonth()===CUR_MONTH;
     });
-    const aprWonFinal = wonThisMonth.reduce((s,q)=>s+elephantAdj(q.total_price||0),0);
+    const aprWonFinal = wonThisMonth.reduce((s,q)=>s+dashVal(q),0);
     document.getElementById('m2val').textContent = fmtK(aprWonFinal);
     document.getElementById('m2sub').textContent = `${wonThisMonth.length} POs from quoting engine`;
     document.getElementById('m3val').textContent = aprOpen;
@@ -485,11 +487,11 @@ async function loadLive() {
     document.getElementById('recentQuotes').innerHTML = recent.length===0
       ? `<div class="empty-state">No quotes entered in quoting engine yet today.<br>Enter a quote at quotes.allweldfab.com and it'll appear here.</div>`
       : recent.map(q=>{
-          const raw=q.total_price||0, adj=elephantAdj(raw);
+          const raw=q.total_price||0, adj=dashVal(q);
           const d=new Date(q.created_at);
           return `<div class="q-row">
             <span class="q-cust" title="${q.customer_name||''}">${normCust(q.customer_name)||'—'}</span>
-            <span class="q-amt">${fmt(adj)}${raw>ELEPHANT?`<span class="eleph">50%</span>`:''}</span>
+            <span class="q-amt">${fmt(adj)}${(!q.won && raw>ELEPHANT)?`<span class="eleph">50%</span>`:''}</span>
             <span class="q-date">${d.getMonth()+1}/${d.getDate()}</span>
             <span class="q-st ${q.won?'s-won':'s-open'}">${q.won?'won':(q.status||'open')}</span>
           </div>`;
@@ -498,7 +500,7 @@ async function loadLive() {
     document.getElementById('paceTitle').textContent = `April pace — day ${today}/${DAYS_IN_MONTH}`;
     // Split-time pace: month + today
     const todayStart=new Date(CUR_YEAR,CUR_MONTH,today,0,0,0);
-    const quotesToday=allLive.filter(q=>new Date(q.created_at)>=todayStart).reduce((s,q)=>s+elephantAdj(q.total_price||0),0);
+    const quotesToday=allLive.filter(q=>new Date(q.created_at)>=todayStart).reduce((s,q)=>s+dashVal(q),0);
     const priorDailyRate=priorMonthVal/DAYS_IN_MONTH;
     const todayVsTarget=priorDailyRate>0?quotesToday/priorDailyRate:0;
     document.getElementById('paceContent').innerHTML = `
