@@ -918,7 +918,7 @@ const sbAuth = {
         headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
         body: JSON.stringify({email, password})
       }).then(r => r.json());
-      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      if (data.error || data.error_description || data.msg || data.message) throw new Error(data.error_description || data.msg || data.message || data.error);
       saveTokens(data.access_token, data.refresh_token, data.expires_in);
       return {data: {user: data.user, session: data}, error: null};
     } catch(e) { return {data: null, error: e}; }
@@ -931,7 +931,7 @@ const sbAuth = {
         headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
         body: JSON.stringify({email, password, data: options.data||{}})
       }).then(r => r.json());
-      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      if (data.error || data.error_description || data.msg || data.message) throw new Error(data.error_description || data.msg || data.message || data.error);
       if (data.access_token) saveTokens(data.access_token, data.refresh_token, data.expires_in);
       return {data: {user: data.user || data}, error: null};
     } catch(e) { return {data: null, error: e}; }
