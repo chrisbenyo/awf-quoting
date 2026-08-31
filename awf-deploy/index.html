@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AWF Quoting — v6</title>
+<title>QuoteToFloor</title>
 <!-- Supabase JS library replaced with direct REST API calls -->
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
@@ -368,7 +368,7 @@ table.bom select option{background:var(--surface2);}
 <body>
 
 <div id="loader">
-  <div class="loader-logo">AWF</div>
+  <div class="loader-logo">QTF</div>
   <div class="spinner"></div>
   <div class="loader-sub">Loading…</div>
 </div>
@@ -377,11 +377,11 @@ table.bom select option{background:var(--surface2);}
   <div class="login-card">
     <div class="login-logo">
       <div class="login-logo-mark">AW</div>
-      <div class="login-logo-text"><strong>All Welding &amp; Fabrication</strong>Quoting System v6</div>
+      <div class="login-logo-text"><strong>QuoteToFloor</strong>Quoting System</div>
     </div>
     <div style="font-size:18px;font-weight:600;margin-bottom:4px" id="login-title">Sign in</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:22px" id="login-sub">Troy, MI — allweldfab.com</div>
-    <div class="lfield"><label>Email</label><input type="email" id="login-email" placeholder="you@allweldfab.com" autocomplete="email"></div>
+    <div class="lfield"><label>Email</label><input type="email" id="login-email" placeholder="you@yourcompany.com" autocomplete="email"></div>
     <div class="lfield"><label>Password</label><input type="password" id="login-pass" placeholder="••••••••"></div>
     <div class="lfield" id="login-name-field" style="display:none"><label>Full name</label><input type="text" id="login-name" placeholder="Your name"></div>
     <button class="btn btn-primary" onclick="doAuth()" id="login-btn">Sign in</button>
@@ -390,14 +390,14 @@ table.bom select option{background:var(--surface2);}
     <div class="login-toggle" style="margin-top:8px"><a onclick="forgotPassword()" style="color:var(--text3);font-size:11px">Forgot password?</a></div>
     <div style="margin-top:20px;padding-top:14px;border-top:1px solid var(--border);text-align:center;font-size:10px;color:var(--text3);font-family:var(--font);line-height:1.6;">
       Confidential — Authorized Users Only<br>
-      © 2026 Benyo Holdings, LLC · All Welding &amp; Fabrication Co.
+      © 2026 QuoteToFloor · Benyo Holdings, LLC
     </div>
   </div>
 </div>
 
 <div id="app">
   <div class="topbar">
-    <div class="topbar-logo">AWF// QUOTES</div>
+    <div class="topbar-logo">QUOTES</div>
     <div class="topbar-sep"></div>
     <div class="topbar-user">
       <span id="topbar-name">—</span>
@@ -444,7 +444,7 @@ table.bom select option{background:var(--surface2);}
       </div>
     </div>
     <div class="quote-list" id="quote-list" style="flex:1;overflow-y:auto;padding-bottom:28px;"></div>
-    <div class="sidebar-copyright no-print">© 2026 Benyo Holdings, LLC · AWF</div>
+    <div class="sidebar-copyright no-print">© 2026 QuoteToFloor · Benyo Holdings, LLC</div>
   </div>
 
   <div class="main-content" id="main-content">
@@ -1370,7 +1370,7 @@ function toggleAuthMode(){
   authMode=authMode==='signin'?'signup':'signin';
   const s=authMode==='signup';
   document.getElementById('login-title').textContent=s?'Create account':'Sign in';
-  document.getElementById('login-sub').textContent=s?'Join your team on AWF Quotes':'Troy, MI — allweldfab.com';
+  document.getElementById('login-sub').textContent=s?'Join your team on QuoteToFloor':'Powered by QuoteToFloor';
   document.getElementById('login-btn').textContent=s?'Create account':'Sign in';
   document.getElementById('login-name-field').style.display=s?'block':'none';
   document.getElementById('login-toggle-text').textContent=s?'Already have an account?':"Don't have an account?";
@@ -1381,7 +1381,7 @@ async function forgotPassword(){
   const email=document.getElementById('login-email').value.trim();
   if(!email){document.getElementById('login-err').textContent='Enter your email first.';return;}
   const{error}=await sbAuth.resetPasswordForEmail(email,{
-    redirectTo:'https://quotes.allweldfab.com'
+    redirectTo:'https://quotes.eliteweldfab.com'
   });
   if(error){document.getElementById('login-err').textContent=error.message;return;}
   document.getElementById('login-err').style.color='var(--green)';
@@ -2682,7 +2682,7 @@ async function generateOrderReport() {
       pages += `<div class="report-page" style="width:11in;height:8.4in;padding:0.25in 0.35in;font-family:Arial,sans-serif;font-size:8.5pt;${isLastPage?'':'page-break-after:always;'}page-break-inside:avoid;box-sizing:border-box;background:white;color:black;overflow:hidden;">
         <!-- Header -->
         <div style="display:flex;align-items:baseline;border-bottom:2px solid #000;padding-bottom:5px;margin-bottom:5px;">
-          <div style="flex:1;font-size:18pt;font-weight:bold;">All Welding and Fabricating</div>
+          <div style="flex:1;font-size:18pt;font-weight:bold;">Elite Welding & Fabrication</div>
           <div style="display:flex;align-items:flex-start;gap:12px;">
             <div id="qr-${detailNum}-${ci}" style="width:120px;height:120px;"></div>
             <div style="text-align:right;"><span style="font-size:14pt;font-weight:bold;">QUOTE &nbsp; Q${q.number}</span><br><span style="font-size:8.5pt;">RFQ: ${q.customer_quote_num||'—'}</span><br><span style="font-size:7pt;color:#666;">PO: ${q.po_number||'TBD'} · Det: ${detailNum}</span></div>
@@ -3443,10 +3443,10 @@ function renderPrintPreview() {
 
   el.innerHTML = `
     <div class="print-header">
-      <img src="https://allweldfab.com/logo.png" class="print-logo" alt="All Weld" onerror="this.style.display='none'">
+      <img src="https://eliteweldfab.com/logo.png" class="print-logo" alt="Elite Welding & Fabrication" onerror="this.style.display='none'">
       <div class="print-company">
-        <h1>All Welding and Fabricating</h1>
-        <div style="font-size:11px;color:#444">1882 Woodslee Drive, Troy, MI 48083<br>248-689-0986 | Quotes@allweldfab.com</div>
+        <h1>Elite Welding & Fabrication</h1>
+        <div style="font-size:11px;color:#444">eliteweldfab.com</div>
         <div style="margin-top:4px;font-size:12px">Date &nbsp; ${dateStr}</div>
         <div class="print-quote-box">QUOTE #${q.number}</div>
       </div>
@@ -3465,7 +3465,7 @@ function renderPrintPreview() {
       </tbody>
     </table>
     ${notes ? `<div style="margin-bottom:16px;font-size:11px;"><strong>Notes:</strong> ${esc(notes)}</div>` : ''}
-    <div class="print-footer">All Welding &amp; Fabrication Co. | allweldfab.com | Quotes@allweldfab.com | Quote valid for 30 days</div>`;
+    <div class="print-footer">Elite Welding & Fabrication | Quote valid for 30 days</div>`;
 }
 
 function printQuote() {
@@ -3473,7 +3473,7 @@ function printQuote() {
   renderPrintPreview();
   showQuoteTab('preview');
   const origTitle = document.title;
-  document.title = 'All Weld Q' + (q?.number || '');
+  document.title = 'Elite Q' + (q?.number || '');
   setTimeout(() => { window.print(); document.title = origTitle; }, 350);
 }
 
