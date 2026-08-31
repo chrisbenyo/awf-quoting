@@ -734,7 +734,7 @@ window.addEventListener('error', e => {
 // SUPABASE REST CLIENT — no library, no locks, no background processes
 // ============================================================
 const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2ZmtvZXVoaGdmbWRyc25pZnlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MjAzNTQsImV4cCI6MjA4OTE5NjM1NH0.4xOA1ypUB2o5B466mNqQOXElBOZRedcxMIWBRwdlgGA';
 
 // Auth token storage
 let _authToken = null;
@@ -918,7 +918,7 @@ const sbAuth = {
         headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
         body: JSON.stringify({email, password})
       }).then(r => r.json());
-      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      if (data.error || data.error_description || data.msg || data.message) throw new Error(data.error_description || data.msg || data.message || data.error);
       saveTokens(data.access_token, data.refresh_token, data.expires_in);
       return {data: {user: data.user, session: data}, error: null};
     } catch(e) { return {data: null, error: e}; }
@@ -931,7 +931,7 @@ const sbAuth = {
         headers: {'apikey': SUPABASE_ANON, 'Content-Type': 'application/json'},
         body: JSON.stringify({email, password, data: options.data||{}})
       }).then(r => r.json());
-      if (data.error || data.error_description) throw new Error(data.error_description || data.error);
+      if (data.error || data.error_description || data.msg || data.message) throw new Error(data.error_description || data.msg || data.message || data.error);
       if (data.access_token) saveTokens(data.access_token, data.refresh_token, data.expires_in);
       return {data: {user: data.user || data}, error: null};
     } catch(e) { return {data: null, error: e}; }
