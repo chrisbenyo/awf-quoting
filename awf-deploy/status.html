@@ -334,7 +334,8 @@ function computeStatus(job, events){
   const station = (latest.station || '').toUpperCase();
   const isShippedStation = (station === 'SHIPPED' || station === 'SHIP');
 
-  if(latest.event_type === 'checkout' && isShippedStation){
+  // Any latest event at the SHIPPED station counts as shipped (handles bulk-update check-ins with no check-out)
+  if(isShippedStation){
     return {kind:'shipped', label:'Shipped ✓', station:'SHIPPED',
             lastEventAt:latest.created_at, badgeClass:'shipped'};
   }
