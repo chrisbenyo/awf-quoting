@@ -217,10 +217,18 @@ table.bom select option{background:var(--surface2);}
 @page{size:portrait;margin:15mm;}
 @media print{
   .topbar,.sidebar,.review-panel,.modal-overlay,.quote-hdr-actions,.cbar,.detail-list-bar,.detail-body,.ql-section,.notes-section,.grand-total-bar,.quote-tab-bar,.no-print{display:none!important;}
-  .main-content{margin-left:0!important;margin-top:0!important;}
+  .main-content{margin-left:0!important;margin-top:0!important;overflow:visible!important;height:auto!important;}
   body{background:white!important;}
-  #print-area{display:block!important;}
+  #print-area{display:block!important;overflow:visible!important;}
   #build-area{display:none!important;}
+  /* release the fixed-height/overflow ancestors so the quote flows across pages */
+  html,body{height:auto!important;overflow:visible!important;}
+  #app{height:auto!important;overflow:visible!important;display:block!important;}
+  .print-preview-wrap{display:block!important;min-height:0!important;padding:0!important;overflow:visible!important;background:white!important;}
+  .quote-print{overflow:visible!important;}
+  /* elegant pagination: repeat header each page, don't split a row */
+  .print-items-table thead{display:table-header-group;}
+  .print-items-table tr{page-break-inside:avoid;break-inside:avoid;}
 }
 .quote-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;}
 .quote-tab{padding:9px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;letter-spacing:.05em;margin-bottom:-1px;transition:all .12s;}
