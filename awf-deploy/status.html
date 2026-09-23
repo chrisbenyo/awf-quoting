@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AWF — Job Status Report</title>
+<title>Elite Welding &amp; Fabrication — Job Status Report</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
@@ -182,13 +182,13 @@ table.details .col-activity{width:140px;color:var(--ink-light);font-size:11px;}
 <body>
 
 <div id="loader">
-  <div style="font-weight:700;color:var(--awf-amber);font-size:18px;letter-spacing:.04em;">AWF</div>
+  <div style="font-weight:700;color:var(--awf-amber);font-size:18px;letter-spacing:.04em;">Elite Welding &amp; Fabrication</div>
   <div class="spinner"></div>
   <div style="font-size:11px;color:var(--ink-light);">Loading status report…</div>
 </div>
 
 <div class="controlbar">
-  <span class="brand">AWF</span>
+  <span class="brand">Elite Welding &amp; Fabrication</span>
   <span class="sep"></span>
   <span class="meta">Job Status Report</span>
   <div class="right">
@@ -202,7 +202,7 @@ table.details .col-activity{width:140px;color:var(--ink-light);font-size:11px;}
 
   <div class="letterhead">
     <div class="left">
-      <div class="company">All Welding &amp; Fabricating</div>
+      <div class="company">Elite Welding &amp; Fabrication</div>
       <div class="tagline">Custom Steel Fabrication · Troy, MI</div>
     </div>
     <div class="right">
@@ -226,7 +226,7 @@ table.details .col-activity{width:140px;color:var(--ink-light);font-size:11px;}
   <div id="po-list"></div>
 
   <div class="report-footer">
-    <div>All Welding &amp; Fabricating · Troy, MI</div>
+    <div>Elite Welding &amp; Fabrication</div>
     <div id="footer-date">—</div>
   </div>
 
@@ -236,8 +236,8 @@ table.details .col-activity{width:140px;color:var(--ink-light);font-size:11px;}
 // ============================================================
 // Auth — matches index.html (key 'awf_token', fields access/refresh/expiry in ms)
 // ============================================================
-const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+const SUPABASE_URL  = 'https://duxqbwlnpduwsibjqkff.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1eHFid2xucGR1d3NpYmpxa2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxODk4MDUsImV4cCI6MjEwMzc2NTgwNX0.sSpaiXFVpRCNPk3J0JFeg1N_iX9mu6jO4f-PZLvLoAQ';
 
 let _authToken = null, _refreshToken = null, _tokenExpiry = null;
 
@@ -334,7 +334,8 @@ function computeStatus(job, events){
   const station = (latest.station || '').toUpperCase();
   const isShippedStation = (station === 'SHIPPED' || station === 'SHIP');
 
-  if(latest.event_type === 'checkout' && isShippedStation){
+  // Any latest event at the SHIPPED station counts as shipped (handles bulk-update check-ins with no check-out)
+  if(isShippedStation){
     return {kind:'shipped', label:'Shipped ✓', station:'SHIPPED',
             lastEventAt:latest.created_at, badgeClass:'shipped'};
   }
@@ -426,13 +427,28 @@ function renderReport(customerName, jobs, events){
     byPO.get(po).push(a);
   }
 
-  // Render PO blocks
-  const blocks = [];
-  for(const [po, group] of byPO){
-    // Earliest due date in the group, if any
+  // Sort PO groups: fully-shipped POs sink to the bottom; open POs by earliest due date, then how far along.
+  const STATUS_RANK = {dispatched:0, progress:1, completed:2, shipped:3};
+  const poEntries = [...byPO.entries()].map(([po, group]) => {
+    const fullyShipped = group.every(a => a.status.kind === 'shipped');
     const dues = group.map(a => a.job.due_date).filter(Boolean).map(d => new Date(d));
     const minDue = dues.length ? dues.reduce((a,b) => a < b ? a : b) : null;
+    const openRanks = group.filter(a => a.status.kind !== 'shipped').map(a => STATUS_RANK[a.status.kind] ?? 0);
+    const statusRank = openRanks.length ? Math.min(...openRanks) : 99;
+    return {po, group, fullyShipped, minDue, statusRank};
+  });
+  poEntries.sort((a,b) => {
+    if(a.fullyShipped !== b.fullyShipped) return a.fullyShipped ? 1 : -1;   // fully-shipped POs last
+    const ad = a.minDue ? a.minDue.getTime() : Infinity;                    // soonest due first, undated last
+    const bd = b.minDue ? b.minDue.getTime() : Infinity;
+    if(ad !== bd) return ad - bd;
+    if(a.statusRank !== b.statusRank) return a.statusRank - b.statusRank;   // least-advanced open detail first
+    return a.po.toString().localeCompare(b.po.toString(), undefined, {numeric:true});
+  });
 
+  // Render PO blocks
+  const blocks = [];
+  for(const {po, group, minDue} of poEntries){
     const rows = group.map(a => {
       const j = a.job, s = a.status;
       const desc = j.detail_name && j.detail_name.trim() ? j.detail_name : '<span style="color:var(--ink-light);">(no description)</span>';
@@ -520,7 +536,7 @@ async function boot(){
     .map(q => q.id);
 
   if(matchingQuoteIds.length === 0){
-    document.title = `AWF Status — ${customerParam}`;
+    document.title = `Elite Status — ${customerParam}`;
     document.getElementById('loader').style.display = 'none';
     document.getElementById('paper').style.display = 'block';
     renderEmpty(customerParam);
@@ -541,7 +557,7 @@ async function boot(){
   }
 
   if(jobs.length === 0){
-    document.title = `AWF Status — ${customerParam}`;
+    document.title = `Elite Status — ${customerParam}`;
     document.getElementById('loader').style.display = 'none';
     document.getElementById('paper').style.display = 'block';
     renderEmpty(customerParam);
@@ -561,7 +577,7 @@ async function boot(){
   }
 
   // Render
-  document.title = `AWF Status — ${customerParam}`;
+  document.title = `Elite Status — ${customerParam}`;
   document.getElementById('loader').style.display = 'none';
   document.getElementById('paper').style.display = 'block';
   renderReport(customerParam, jobs, events);

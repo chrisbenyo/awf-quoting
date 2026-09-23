@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AWF Quoting — Customers</title>
+<title>QuoteToFloor — Customers</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap');
 :root {
@@ -78,13 +78,13 @@ table.report tr.totals td:first-child{color:var(--amber);font-family:var(--font)
 <body>
 
 <div id="loader">
-  <div style="font-family:var(--font);color:var(--amber);font-size:18px;">AWF</div>
+  <div style="font-family:var(--font);color:var(--amber);font-size:18px;">QuoteToFloor</div>
   <div class="spinner"></div>
   <div style="font-size:11px;color:var(--text3);font-family:var(--font);">Loading customers…</div>
 </div>
 
 <div class="topbar">
-  <div class="topbar-logo">AWF</div>
+  <div class="topbar-logo">QuoteToFloor</div>
   <div class="topbar-sep"></div>
   <div class="topbar-title">Customer Report</div>
   <div class="topbar-right">
@@ -133,8 +133,8 @@ table.report tr.totals td:first-child{color:var(--amber);font-family:var(--font)
 // ============================================================
 // Supabase client — same pattern as index.html
 // ============================================================
-const SUPABASE_URL  = 'https://evfkoeuhhgfmdrsnifyd.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_jZ2wGIvrlQqM3hyp284yQA_MmGlkRCq';
+const SUPABASE_URL  = 'https://duxqbwlnpduwsibjqkff.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1eHFid2xucGR1d3NpYmpxa2ZmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgxODk4MDUsImV4cCI6MjEwMzc2NTgwNX0.sSpaiXFVpRCNPk3J0JFeg1N_iX9mu6jO4f-PZLvLoAQ';
 
 // Match index.html exactly: key='awf_token', fields={access,refresh,expiry}, expiry in ms (Date.now() + lifetime).
 let _authToken = null;
