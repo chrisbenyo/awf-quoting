@@ -334,7 +334,8 @@ function computeStatus(job, events){
   const station = (latest.station || '').toUpperCase();
   const isShippedStation = (station === 'SHIPPED' || station === 'SHIP');
 
-  if(latest.event_type === 'checkout' && isShippedStation){
+  // Any latest event at the SHIPPED station counts as shipped (handles bulk-update check-ins with no check-out)
+  if(isShippedStation){
     return {kind:'shipped', label:'Shipped ✓', station:'SHIPPED',
             lastEventAt:latest.created_at, badgeClass:'shipped'};
   }
@@ -426,13 +427,28 @@ function renderReport(customerName, jobs, events){
     byPO.get(po).push(a);
   }
 
-  // Render PO blocks
-  const blocks = [];
-  for(const [po, group] of byPO){
-    // Earliest due date in the group, if any
+  // Sort PO groups: fully-shipped POs sink to the bottom; open POs by earliest due date, then how far along.
+  const STATUS_RANK = {dispatched:0, progress:1, completed:2, shipped:3};
+  const poEntries = [...byPO.entries()].map(([po, group]) => {
+    const fullyShipped = group.every(a => a.status.kind === 'shipped');
     const dues = group.map(a => a.job.due_date).filter(Boolean).map(d => new Date(d));
     const minDue = dues.length ? dues.reduce((a,b) => a < b ? a : b) : null;
+    const openRanks = group.filter(a => a.status.kind !== 'shipped').map(a => STATUS_RANK[a.status.kind] ?? 0);
+    const statusRank = openRanks.length ? Math.min(...openRanks) : 99;
+    return {po, group, fullyShipped, minDue, statusRank};
+  });
+  poEntries.sort((a,b) => {
+    if(a.fullyShipped !== b.fullyShipped) return a.fullyShipped ? 1 : -1;   // fully-shipped POs last
+    const ad = a.minDue ? a.minDue.getTime() : Infinity;                    // soonest due first, undated last
+    const bd = b.minDue ? b.minDue.getTime() : Infinity;
+    if(ad !== bd) return ad - bd;
+    if(a.statusRank !== b.statusRank) return a.statusRank - b.statusRank;   // least-advanced open detail first
+    return a.po.toString().localeCompare(b.po.toString(), undefined, {numeric:true});
+  });
 
+  // Render PO blocks
+  const blocks = [];
+  for(const {po, group, minDue} of poEntries){
     const rows = group.map(a => {
       const j = a.job, s = a.status;
       const desc = j.detail_name && j.detail_name.trim() ? j.detail_name : '<span style="color:var(--ink-light);">(no description)</span>';
