@@ -797,6 +797,20 @@ const sbDB = {
   }
 };
 
+// Batched id lookup — replaces per-row N+1 fetch loops. Chunks to keep URLs sane, runs chunks in parallel.
+async function sbFetchByIds(table, selectCols, ids, idCol='id') {
+  const uniq = [...new Set((ids||[]).filter(v => v !== null && v !== undefined))];
+  if (!uniq.length) return [];
+  const CHUNK = 120;
+  const chunks = [];
+  for (let i=0;i<uniq.length;i+=CHUNK) chunks.push(uniq.slice(i,i+CHUNK));
+  const results = await Promise.all(chunks.map(async c => {
+    const { data } = await sbDB.from(table).select(selectCols).in(idCol, c);
+    return data || [];
+  }));
+  return results.flat();
+}
+
 class QueryBuilder {
   constructor(table) {
     this._table = table;
@@ -808,6 +822,7 @@ class QueryBuilder {
   }
   select(cols) { this._select = cols; return this; }
   eq(col, val) { this._filters.push(`${col}=eq.${encodeURIComponent(val)}`); return this; }
+  in(col, vals) { this._filters.push(`${col}=in.(${vals.map(v=>encodeURIComponent(v)).join(',')})`); return this; }
   order(col, {ascending=true, nullsFirst=false}={}) {
     this._order = `${col}.${ascending?'asc':'desc'}${nullsFirst?'.nullsfirst':''}`;
     return this;
@@ -3532,10 +3547,8 @@ async function loadFloorBoard() {
     // Get customer names from quotes
     const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
     const custMap = {};
-    for (const qid of quoteIds) {
-      const {data:q} = await sbDB.from('quotes').select('id,customer_name').eq('id',qid).single();
-      if (q) custMap[qid] = q.customer_name || '—';
-    }
+    const qRows = await sbFetchByIds('quotes', 'id,customer_name', quoteIds);
+    for (const q of qRows) custMap[q.id] = q.customer_name || '—';
     // Get latest stage per job from events
     const {data:evts} = await sbDB.from('shop_events').select('shop_job_id,station,created_at').order('created_at',{ascending:false});
     const stageMap = {};
@@ -3625,12 +3638,10 @@ async function loadPendingDispatch() {
   }
   const quoteIds = wonQuotes.map(q => q.id);
 
-  // Fetch line items sequentially — reliable and safe
-  let allItems = [];
-  for (const qid of quoteIds) {
-    const { data: items, error: liErr } = await sbDB.from('line_items').select('*').eq('quote_id', qid).order('sort_order');
-    if (items) allItems = allItems.concat(items.map(i => ({...i, _qid: qid})));
-  }
+  // Fetch line items for all won quotes in one batched query (was N+1 sequential per quote)
+  let allItems = (await sbFetchByIds('line_items', '*', quoteIds, 'quote_id'))
+    .map(i => ({...i, _qid: i.quote_id}));
+  allItems.sort((a,b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   // Build detail map per quote
   const quoteDetailMap = {};
@@ -4129,10 +4140,8 @@ async function loadActiveJobs() {
   // Get customer names AND won_at from quotes table via quote_id
   const quoteIds = [...new Set(jobs.filter(j=>j.quote_id).map(j=>j.quote_id))];
   const quoteInfoMap = {};
-  for (const qid of quoteIds) {
-    const {data:q} = await sbDB.from('quotes').select('id,customer_name,won_at').eq('id',qid).single();
-    if (q) quoteInfoMap[qid] = { customer: q.customer_name || '—', won_at: q.won_at || null };
-  }
+  const qRows = await sbFetchByIds('quotes', 'id,customer_name,won_at', quoteIds);
+  for (const q of qRows) quoteInfoMap[q.id] = { customer: q.customer_name || '—', won_at: q.won_at || null };
 
   // Get latest event per job for current stage
   const { data: events } = await sbDB.from('shop_events')
