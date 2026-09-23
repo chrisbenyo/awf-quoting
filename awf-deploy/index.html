@@ -804,9 +804,10 @@ async function sbFetchByIds(table, selectCols, ids, idCol='id') {
   const CHUNK = 120;
   const chunks = [];
   for (let i=0;i<uniq.length;i+=CHUNK) chunks.push(uniq.slice(i,i+CHUNK));
-  const results = await Promise.all(chunks.map(c =>
-    sbDB.from(table).select(selectCols).in(idCol, c).then(r => r.data || [])
-  ));
+  const results = await Promise.all(chunks.map(async c => {
+    const { data } = await sbDB.from(table).select(selectCols).in(idCol, c);
+    return data || [];
+  }));
   return results.flat();
 }
 
