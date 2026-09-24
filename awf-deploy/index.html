@@ -2583,24 +2583,16 @@ async function changePassword(){
 // Convert decimal inches to nearest fractional inch string
 function decimalToFraction(decimal) {
   if (decimal === null || isNaN(decimal)) return '';
-  const whole = Math.floor(decimal);
-  const frac = decimal - whole;
-  if (frac < 0.015) return whole ? String(whole) : '0';
-  // Find best fraction using 16ths max (no 32nds on shop floor)
-  const denominators = [2,4,8,16];
-  let bestNum=1,bestDen=2,bestErr=Infinity;
-  for (const den of denominators) {
-    // Floor to nearest (never round up — always go to lower 16th)
-    const num = Math.floor(frac * den);
-    if (num === 0 || num === den) continue;
-    const err = frac - num/den; // positive = we went lower, that's ok
-    if (err >= 0 && err < bestErr) { bestErr=err; bestNum=num; bestDen=den; }
-  }
+  // Round to the NEAREST 1/16 (shop-floor resolution). Replaces the old floor-to-lower-16th
+  // logic, which under-sized every metric conversion (6.93" -> 6 7/8 instead of 6 15/16) and
+  // fell through to a bad "1/2" default for leftovers under 1/16 (12.05" -> 12 1/2, 102mm -> 4 1/2).
+  const sixteenths = Math.round(decimal * 16);
+  const whole = Math.floor(sixteenths / 16);
+  let num = sixteenths - whole * 16;
+  if (num === 0) return whole ? String(whole) : '0';
   const gcd=(a,b)=>b?gcd(b,a%b):a;
-  const g=gcd(bestNum,bestDen);
-  bestNum/=g; bestDen/=g;
-  const fracStr = bestDen===1 ? '' : ` ${bestNum}/${bestDen}`;
-  return whole ? `${whole}${fracStr}` : `${bestNum}/${bestDen}`;
+  const g=gcd(num,16); num/=g; const den=16/g;
+  return whole ? `${whole} ${num}/${den}` : `${num}/${den}`;
 }
 
 function dimToFracIn(val, unit) {
