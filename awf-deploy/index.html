@@ -1685,7 +1685,7 @@ async function openQuote(id){
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
-      d.otherItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||''});
+      d.otherItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||'',needsPricing:!!(row.item_data&&row.item_data.needsPricing)});
     } else {
       // Material item
       const idata=row.item_data||{};
@@ -2025,10 +2025,11 @@ function renderDetailBody(locked){
 
   const otherRows=d.otherItems.map(o=>{
     const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
-    return`<tr>
-      <td><input type="text" data-id="${o.id}" data-field="desc" value="${esc(o.desc)}" placeholder="Description" style="width:100%"></td>
+    const needs=o.needsPricing && !(parseFloat(o.unitPrice)>0);
+    return`<tr${needs?' style="background:var(--amber-dim);"':''}>
+      <td><input type="text" data-id="${o.id}" data-field="desc" value="${esc(o.desc)}" placeholder="Description" style="width:100%">${needs?'<span title="Imported from BOM — enter a price" style="font-size:9px;color:var(--amber);font-family:var(--font);margin-left:4px;white-space:nowrap;">⚠ needs pricing</span>':''}</td>
       <td><input type="number" data-id="${o.id}" data-field="qty" value="${o.qty}" min="1" style="width:42px"></td>
-      <td><input type="text" data-id="${o.id}" data-field="unitPrice" value="${esc(o.unitPrice)}" placeholder="$0.00" style="width:72px"></td>
+      <td><input type="text" data-id="${o.id}" data-field="unitPrice" value="${esc(o.unitPrice)}" placeholder="${needs?'⚠ set price':'$0.00'}" style="width:72px${needs?';border-color:var(--amber)':''}"></td>
       <td class="price-cell" id="ot-${o.id}">${fmt(tot)}</td>
       <td>${locked?'':` <button class="btn-icon" onclick="removeOtherItem(${o.id})">✕</button>`}</td>
     </tr>`;
@@ -2454,7 +2455,7 @@ async function saveItems(){
     });
     d.otherItems.forEach(o=>{
       const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
-      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'other',description:o.desc,qty:parseInt(o.qty)||1,unit_price:parseFloat(o.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{detail_idx:di}});
+      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'other',description:o.desc,qty:parseInt(o.qty)||1,unit_price:parseFloat(o.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{detail_idx:di,needsPricing:!!o.needsPricing}});
     });
   });
   quoteLevelItems.forEach(q=>{
@@ -3270,10 +3271,19 @@ function confirmPdfImport() {
     details = [];
   }
 
-  let totalImported = 0;
+  // Count auto-priceable vs unpriceable lines up front (for the confirm + placeholders)
+  let measurableCount = 0, placeholderCount = 0;
+  validDetails.forEach(d => (d.items||[]).forEach(i => { if(i.error) placeholderCount++; else measurableCount++; }));
+  if (placeholderCount > 0) {
+    const msg = measurableCount === 0
+      ? `None of the ${placeholderCount} BOM line(s) could be auto-priced. They'll be added as $0 freeform items flagged "needs pricing" for you to fill in. Continue?`
+      : `${placeholderCount} line(s) couldn't be auto-priced and will be added as $0 freeform items flagged "needs pricing" (the ${measurableCount} priceable line(s) import normally). Continue?`;
+    if (!confirm(msg)) return;
+  }
+
+  let totalImported = 0, totalPlaceholders = 0;
   validDetails.forEach(d => {
-    const goodItems = d.items.filter(i => !i.error);
-    if (!goodItems.length) return;
+    if (!(d.items && d.items.length)) return;   // nothing at all in this detail
 
     // Add a new detail for each
     const newDetail = {
@@ -3285,19 +3295,33 @@ function confirmPdfImport() {
       holes: 0,
       adjustment: 0,
       quantity: 1,
-      notes: ''
+      notes: '',
+      detailOverridePrice: '',
+      material: 'A36',
+      labor: {fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}
     };
 
     d.items.forEach(item => {
       const dm = item.dims || {};
-      const hasError = !!(item.error);
+      if (item.error) {
+        // Unresolved line: keep it as a freeform $0 placeholder with the real BOM label, flagged for pricing
+        newDetail.otherItems.push({
+          id: nextLocalId++,
+          desc: (item.description && item.description.trim()) ? item.description : (item.error || 'Unresolved BOM line'),
+          qty: item.qty || 1,
+          unitPrice: '',
+          needsPricing: true
+        });
+        totalPlaceholders++;
+        return;
+      }
       newDetail.items.push({
         id: nextLocalId++,
-        type: hasError ? 'other' : item.type,
+        type: item.type,
         qty: item.qty || 1,
         manualPrice: '',
-        parseError: hasError ? (item.error || 'LINE NOT READ') : '',
-        description: hasError ? (item.error || 'LINE NOT READ') : '',
+        parseError: '',
+        description: '',
         thickness: dm.thickness||'', width: dm.width||'', widthUnit: dm.widthUnit||'in',
         length: dm.length||'', lengthUnit: dm.lengthUnit||'in',
         dim1: dm.dim1||'', dim2: dm.dim2||'', wall: dm.wall||'',
@@ -3319,7 +3343,7 @@ function confirmPdfImport() {
   renderDetailBody(false);
   saveItems();
   showQuoteTab('build');
-  toast(`Imported ${validDetails.length} detail${validDetails.length!==1?'s':''}, ${totalImported} items ✓`, 'ok');
+  toast(`Imported ${validDetails.length} detail${validDetails.length!==1?'s':''}, ${totalImported} priced item${totalImported!==1?'s':''}${totalPlaceholders?` + ${totalPlaceholders} needs-pricing`:''} ✓`, 'ok');
   pendingPdfDetails = [];
 }
 
