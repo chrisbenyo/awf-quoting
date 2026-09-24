@@ -1455,6 +1455,22 @@ function _custNormalize(s){
   return (s||'').toLowerCase().replace(/[.,;:'"()&\-_/\\]/g,' ').replace(/\s+/g,' ').trim()
     .replace(/\b(inc|incorporated|llc|l\.l\.c\.|corp|corporation|co|company|ltd|limited|pllc|pc)\b/g,'').trim();
 }
+// Snap a typed customer name to the established spelling for its normalized key (trims; keeps brand-new names as typed)
+function _custCanonical(name){
+  const raw=(name||'').trim();
+  if(!raw) return raw;
+  const norm=_custNormalize(raw);
+  if(!norm) return raw;
+  const counts=new Map();
+  (typeof quotes!=='undefined'?quotes:[]).forEach(q=>{
+    const r=(q.customer_name||'').trim();
+    if(r && _custNormalize(r)===norm) counts.set(r,(counts.get(r)||0)+1);
+  });
+  if(!counts.size) return raw;
+  let best=raw, bestCount=-1;
+  for(const [sp,c] of counts){ if(c>bestCount || (c===bestCount && sp.length>best.length)){ best=sp; bestCount=c; } }
+  return best;
+}
 function _buildCustomerIndex(){
   // Map of normalized → {display: longest variant, count: occurrences}
   const map = new Map();
@@ -2385,7 +2401,7 @@ function buildHeaderPatch(){
   const fTerms     = document.getElementById('field-terms');
   const fNotes     = document.getElementById('field-notes');
   const patch={total_price:total};
-  if(fCustomer)  patch.customer_name      = fCustomer.value;
+  if(fCustomer)  patch.customer_name      = _custCanonical(fCustomer.value);
   if(fCustQuote) patch.customer_quote_num = fCustQuote.value;
   if(fLocation)  patch.location           = fLocation.value;
   if(fLead)      patch.lead_time_weeks    = parseInt(fLead.value)||null;
@@ -2636,6 +2652,10 @@ function formatItemForReport(item) {
 async function generateOrderReport() {
   const q = quotes.find(x => x.id === currentQuoteId);
   if (!q) { toast('No quote selected','err'); return; }
+  // Gate: order reports/travelers are for won work with a PO. Warn (allow override) if none.
+  if (!((q.po_number||'').trim())) {
+    if (!confirm('This quote has no PO number.\n\nOrder reports / travelers are normally printed after a PO is entered. Print anyway?')) return;
+  }
 
   // If details haven't loaded yet, reload them first then retry
   if (!details.length || !details.some(d => (d.items&&d.items.length)||(d.otherItems&&d.otherItems.length))) {
@@ -3373,7 +3393,7 @@ function selectOdooCustomer(odooId) {
 }
 
 async function saveCustomer() {
-  const name = document.getElementById('cf-name').value.trim();
+  const name = _custCanonical(document.getElementById('cf-name').value);
   if (!name) { toast('Customer name required','err'); return; }
   const rec = {
     name,
