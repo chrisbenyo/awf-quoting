@@ -2606,7 +2606,11 @@ function decimalToFraction(decimal) {
 function dimToFracIn(val, unit) {
   const n = parseFraction(val);
   if (n === null || n === 0) return val || '';
-  const inches = (unit === 'mm') ? n / 25.4 : n;
+  // If the value string already carries a unit suffix (e.g. "306mm"), parseFraction already
+  // converted to inches — don't reapply the mm toggle (matches resolveLength). Without this,
+  // mm-suffixed dims were double-converted and printed tiny/garbled on the traveler + shop views.
+  const hasExplicit = /(?:^|\s|\d)(?:mm|cm|in|")$/i.test(String(val).trim());
+  const inches = hasExplicit ? n : ((unit === 'mm') ? n / 25.4 : n);
   return decimalToFraction(inches) + '"';
 }
 
