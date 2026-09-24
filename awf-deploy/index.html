@@ -217,10 +217,18 @@ table.bom select option{background:var(--surface2);}
 @page{size:portrait;margin:15mm;}
 @media print{
   .topbar,.sidebar,.review-panel,.modal-overlay,.quote-hdr-actions,.cbar,.detail-list-bar,.detail-body,.ql-section,.notes-section,.grand-total-bar,.quote-tab-bar,.no-print{display:none!important;}
-  .main-content{margin-left:0!important;margin-top:0!important;}
+  .main-content{margin-left:0!important;margin-top:0!important;overflow:visible!important;height:auto!important;}
   body{background:white!important;}
-  #print-area{display:block!important;}
+  #print-area{display:block!important;overflow:visible!important;}
   #build-area{display:none!important;}
+  /* release the fixed-height/overflow ancestors so the quote flows across pages */
+  html,body{height:auto!important;overflow:visible!important;}
+  #app{height:auto!important;overflow:visible!important;display:block!important;}
+  .print-preview-wrap{display:block!important;min-height:0!important;padding:0!important;overflow:visible!important;background:white!important;}
+  .quote-print{overflow:visible!important;}
+  /* elegant pagination: repeat header each page, don't split a row */
+  .print-items-table thead{display:table-header-group;}
+  .print-items-table tr{page-break-inside:avoid;break-inside:avoid;}
 }
 .quote-tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);background:var(--surface);padding:0 20px;}
 .quote-tab{padding:9px 18px;background:none;border:none;border-bottom:2px solid transparent;color:var(--text2);cursor:pointer;font-family:var(--font);font-size:12px;letter-spacing:.05em;margin-bottom:-1px;transition:all .12s;}
@@ -1447,6 +1455,22 @@ function _custNormalize(s){
   return (s||'').toLowerCase().replace(/[.,;:'"()&\-_/\\]/g,' ').replace(/\s+/g,' ').trim()
     .replace(/\b(inc|incorporated|llc|l\.l\.c\.|corp|corporation|co|company|ltd|limited|pllc|pc)\b/g,'').trim();
 }
+// Snap a typed customer name to the established spelling for its normalized key (trims; keeps brand-new names as typed)
+function _custCanonical(name){
+  const raw=(name||'').trim();
+  if(!raw) return raw;
+  const norm=_custNormalize(raw);
+  if(!norm) return raw;
+  const counts=new Map();
+  (typeof quotes!=='undefined'?quotes:[]).forEach(q=>{
+    const r=(q.customer_name||'').trim();
+    if(r && _custNormalize(r)===norm) counts.set(r,(counts.get(r)||0)+1);
+  });
+  if(!counts.size) return raw;
+  let best=raw, bestCount=-1;
+  for(const [sp,c] of counts){ if(c>bestCount || (c===bestCount && sp.length>best.length)){ best=sp; bestCount=c; } }
+  return best;
+}
 function _buildCustomerIndex(){
   // Map of normalized → {display: longest variant, count: occurrences}
   const map = new Map();
@@ -1661,7 +1685,7 @@ async function openQuote(id){
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
-      d.otherItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||''});
+      d.otherItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||'',needsPricing:!!(row.item_data&&row.item_data.needsPricing)});
     } else {
       // Material item
       const idata=row.item_data||{};
@@ -2001,10 +2025,11 @@ function renderDetailBody(locked){
 
   const otherRows=d.otherItems.map(o=>{
     const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
-    return`<tr>
-      <td><input type="text" data-id="${o.id}" data-field="desc" value="${esc(o.desc)}" placeholder="Description" style="width:100%"></td>
+    const needs=o.needsPricing && !(parseFloat(o.unitPrice)>0);
+    return`<tr${needs?' style="background:var(--amber-dim);"':''}>
+      <td><input type="text" data-id="${o.id}" data-field="desc" value="${esc(o.desc)}" placeholder="Description" style="width:100%">${needs?'<span title="Imported from BOM — enter a price" style="font-size:9px;color:var(--amber);font-family:var(--font);margin-left:4px;white-space:nowrap;">⚠ needs pricing</span>':''}</td>
       <td><input type="number" data-id="${o.id}" data-field="qty" value="${o.qty}" min="1" style="width:42px"></td>
-      <td><input type="text" data-id="${o.id}" data-field="unitPrice" value="${esc(o.unitPrice)}" placeholder="$0.00" style="width:72px"></td>
+      <td><input type="text" data-id="${o.id}" data-field="unitPrice" value="${esc(o.unitPrice)}" placeholder="${needs?'⚠ set price':'$0.00'}" style="width:72px${needs?';border-color:var(--amber)':''}"></td>
       <td class="price-cell" id="ot-${o.id}">${fmt(tot)}</td>
       <td>${locked?'':` <button class="btn-icon" onclick="removeOtherItem(${o.id})">✕</button>`}</td>
     </tr>`;
@@ -2377,7 +2402,7 @@ function buildHeaderPatch(){
   const fTerms     = document.getElementById('field-terms');
   const fNotes     = document.getElementById('field-notes');
   const patch={total_price:total};
-  if(fCustomer)  patch.customer_name      = fCustomer.value;
+  if(fCustomer)  patch.customer_name      = _custCanonical(fCustomer.value);
   if(fCustQuote) patch.customer_quote_num = fCustQuote.value;
   if(fLocation)  patch.location           = fLocation.value;
   if(fLead)      patch.lead_time_weeks    = parseInt(fLead.value)||null;
@@ -2430,7 +2455,7 @@ async function saveItems(){
     });
     d.otherItems.forEach(o=>{
       const tot=(parseFloat(o.unitPrice)||0)*(parseInt(o.qty)||1);
-      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'other',description:o.desc,qty:parseInt(o.qty)||1,unit_price:parseFloat(o.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{detail_idx:di}});
+      rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'other',description:o.desc,qty:parseInt(o.qty)||1,unit_price:parseFloat(o.unitPrice)||0,total_price:+tot.toFixed(2),source:'manual',item_data:{detail_idx:di,needsPricing:!!o.needsPricing}});
     });
   });
   quoteLevelItems.forEach(q=>{
@@ -2628,6 +2653,10 @@ function formatItemForReport(item) {
 async function generateOrderReport() {
   const q = quotes.find(x => x.id === currentQuoteId);
   if (!q) { toast('No quote selected','err'); return; }
+  // Gate: order reports/travelers are for won work with a PO. Warn (allow override) if none.
+  if (!((q.po_number||'').trim())) {
+    if (!confirm('This quote has no PO number.\n\nOrder reports / travelers are normally printed after a PO is entered. Print anyway?')) return;
+  }
 
   // If details haven't loaded yet, reload them first then retry
   if (!details.length || !details.some(d => (d.items&&d.items.length)||(d.otherItems&&d.otherItems.length))) {
@@ -3242,10 +3271,19 @@ function confirmPdfImport() {
     details = [];
   }
 
-  let totalImported = 0;
+  // Count auto-priceable vs unpriceable lines up front (for the confirm + placeholders)
+  let measurableCount = 0, placeholderCount = 0;
+  validDetails.forEach(d => (d.items||[]).forEach(i => { if(i.error) placeholderCount++; else measurableCount++; }));
+  if (placeholderCount > 0) {
+    const msg = measurableCount === 0
+      ? `None of the ${placeholderCount} BOM line(s) could be auto-priced. They'll be added as $0 freeform items flagged "needs pricing" for you to fill in. Continue?`
+      : `${placeholderCount} line(s) couldn't be auto-priced and will be added as $0 freeform items flagged "needs pricing" (the ${measurableCount} priceable line(s) import normally). Continue?`;
+    if (!confirm(msg)) return;
+  }
+
+  let totalImported = 0, totalPlaceholders = 0;
   validDetails.forEach(d => {
-    const goodItems = d.items.filter(i => !i.error);
-    if (!goodItems.length) return;
+    if (!(d.items && d.items.length)) return;   // nothing at all in this detail
 
     // Add a new detail for each
     const newDetail = {
@@ -3257,19 +3295,33 @@ function confirmPdfImport() {
       holes: 0,
       adjustment: 0,
       quantity: 1,
-      notes: ''
+      notes: '',
+      detailOverridePrice: '',
+      material: 'A36',
+      labor: {fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null}
     };
 
     d.items.forEach(item => {
       const dm = item.dims || {};
-      const hasError = !!(item.error);
+      if (item.error) {
+        // Unresolved line: keep it as a freeform $0 placeholder with the real BOM label, flagged for pricing
+        newDetail.otherItems.push({
+          id: nextLocalId++,
+          desc: (item.description && item.description.trim()) ? item.description : (item.error || 'Unresolved BOM line'),
+          qty: item.qty || 1,
+          unitPrice: '',
+          needsPricing: true
+        });
+        totalPlaceholders++;
+        return;
+      }
       newDetail.items.push({
         id: nextLocalId++,
-        type: hasError ? 'other' : item.type,
+        type: item.type,
         qty: item.qty || 1,
         manualPrice: '',
-        parseError: hasError ? (item.error || 'LINE NOT READ') : '',
-        description: hasError ? (item.error || 'LINE NOT READ') : '',
+        parseError: '',
+        description: '',
         thickness: dm.thickness||'', width: dm.width||'', widthUnit: dm.widthUnit||'in',
         length: dm.length||'', lengthUnit: dm.lengthUnit||'in',
         dim1: dm.dim1||'', dim2: dm.dim2||'', wall: dm.wall||'',
@@ -3291,7 +3343,7 @@ function confirmPdfImport() {
   renderDetailBody(false);
   saveItems();
   showQuoteTab('build');
-  toast(`Imported ${validDetails.length} detail${validDetails.length!==1?'s':''}, ${totalImported} items ✓`, 'ok');
+  toast(`Imported ${validDetails.length} detail${validDetails.length!==1?'s':''}, ${totalImported} priced item${totalImported!==1?'s':''}${totalPlaceholders?` + ${totalPlaceholders} needs-pricing`:''} ✓`, 'ok');
   pendingPdfDetails = [];
 }
 
@@ -3365,7 +3417,7 @@ function selectOdooCustomer(odooId) {
 }
 
 async function saveCustomer() {
-  const name = document.getElementById('cf-name').value.trim();
+  const name = _custCanonical(document.getElementById('cf-name').value);
   if (!name) { toast('Customer name required','err'); return; }
   const rec = {
     name,
