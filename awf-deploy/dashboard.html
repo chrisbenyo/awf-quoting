@@ -194,7 +194,7 @@ const priorMonthVal=PRIOR[CUR_MONTH]||917456;
 
 function elephantAdj(v) { return v > ELEPHANT ? v * 0.5 : v; }
 // Won quotes count at 100%; only open/pipeline quotes get the elephant haircut.
-function dashVal(q){ const v=(q&&q.total_price)||0; return q.won ? v : elephantAdj(v); }
+function dashVal(q){ const base=q?((q.won&&q.awarded_total!=null)?q.awarded_total:q.total_price):0; const v=base||0; return q&&q.won ? v : elephantAdj(v); }
 function fmtK(n) { return '$' + Math.round(n/1000) + 'K'; }
 function fmt(n) { return '$' + Math.round(n).toLocaleString(); }
 
@@ -432,7 +432,7 @@ async function loadLive() {
     buildChart(aprLive, fillerMonths, extraMonths, liveAvg);
     const wonByWeekMap={},wkStart=new Date(2026,3,20);let wc=new Date(wkStart);
     while(wc<=new Date()){wonByWeekMap[`${wc.getMonth()+1}/${wc.getDate()}`]=0;wc.setDate(wc.getDate()+7);}
-    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at).forEach(q=>{
+    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at&&!q.cancelled_at).forEach(q=>{
       const d=new Date(q.won_at);if(d<wkStart)return;
       const day=d.getDay(),diff=day===0?-6:1-day,mon=new Date(d);
       mon.setDate(d.getDate()+diff);mon.setHours(0,0,0,0);
@@ -466,14 +466,14 @@ async function loadLive() {
     document.getElementById('m1val').textContent = fmtK(aprTotal);
     document.getElementById('m1sub').innerHTML = `${fmtK(aprLive)} live · day ${today}/${DAYS_IN_MONTH} · ~${fmtK(pace)} pace &nbsp;<span class="${pctVsLast>=0?'up':'dn'}">${pctVsLast>=0?'▲':'▼'} ${Math.abs(Math.round(pctVsLast))}% vs last ${CUR_MONTH_NAME.slice(0,3)}</span>`;
     const liveWon={};
-    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at).forEach(q=>{
+    (Array.isArray(allYear)?allYear:[]).filter(q=>q.won&&q.won_at&&!q.cancelled_at).forEach(q=>{
       const d=new Date(q.won_at),k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-      liveWon[k]=(liveWon[k]||0)+(q.total_price||0);
+      liveWon[k]=(liveWon[k]||0)+(((q.won&&q.awarded_total!=null)?q.awarded_total:q.total_price)||0);
     });
     buildWonMonthChart(liveWon);
     // Recalculate won this month from allYear using won_at (catches quotes created before month start)
     const wonThisMonth = (Array.isArray(allYear)?allYear:[]).filter(q=>{
-      if(!q.won_at)return false;
+      if(!q.won_at||q.cancelled_at)return false;
       const d=new Date(q.won_at);
       return d.getFullYear()===CUR_YEAR && d.getMonth()===CUR_MONTH;
     });
