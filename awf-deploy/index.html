@@ -644,6 +644,11 @@ table.bom select option{background:var(--surface2);}
     </div>
     <div style="padding:18px 18px 10px;" class="cust-form">
       <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">Enter the customer PO details to complete this win.</div>
+      <div id="won-detail-section" style="margin-bottom:16px;display:none;">
+        <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:6px;">Awarded details <span style="color:var(--text3);">(uncheck any the customer did not award)</span></label>
+        <div id="won-detail-list" style="border:1px solid var(--border);border-radius:var(--radius);max-height:200px;overflow:auto;"></div>
+        <div style="font-size:11px;color:var(--text3);margin-top:5px;">Unchecked details stay in the quote at their price but are skipped for dispatch and the traveler.</div>
+      </div>
       <div class="lfield">
         <label>Customer PO Number <span style="color:var(--red)">*</span></label>
         <input type="text" id="won-po" placeholder="e.g. PO-24601" autocomplete="off"
@@ -1682,6 +1687,8 @@ async function openQuote(id){
       d.detailOverridePrice=row.item_data.detailOverridePrice||'';
       d.material=row.item_data.material||'A36';
       d.labor=row.item_data.labor||{fitHrs:0,weldHrs:0,laborHrs:0,fitRate:null,weldRate:null,laborRate:null};
+      d.awardStatus=row.item_data.award_status||'won';
+      d.awardAt=row.item_data.award_at||null; d.awardBy=row.item_data.award_by||null; d.awardReason=row.item_data.award_reason||'';
     } else if(row.item_type==='quote_level'){
       quoteLevelItems.push({id:nextLocalId++,dbId:row.id,desc:row.description||'',qty:row.qty||1,unitPrice:row.unit_price||0});
     } else if(row.item_type==='other'){
@@ -1947,7 +1954,8 @@ function renderDetailBar(locked){
   if(!bar) return;
   let html=details.map((d,i)=>{
     const{total}=calcDetailTotal(d);
-    return`<button class="detail-pill${i===activeDetailIdx?' active':''}" onclick="selectDetail(${i})">${esc(d.name)||'Detail '+(i+1)} <span style="font-size:10px;opacity:.7">${fmt(total)}</span></button>`;
+    const na=(d.awardStatus||'won')==='not_awarded';
+    return`<button class="detail-pill${i===activeDetailIdx?' active':''}" onclick="selectDetail(${i})" style="${na?'opacity:.6;':''}">${esc(d.name)||'Detail '+(i+1)} <span style="font-size:10px;opacity:.7">${fmt(total)}</span>${na?' <span style="font-size:9px;color:var(--red);white-space:nowrap;">✕ not awarded</span>':''}</button>`;
   }).join('');
   if(!locked) html+=`<button class="add-detail-btn" onclick="addDetail()">+ Detail</button>`;
   bar.innerHTML=html;
@@ -2447,7 +2455,7 @@ async function saveItems(){
   // Build all rows first, THEN delete+insert atomically
   const rows=[];let sort=0;
   details.forEach((d,di)=>{
-    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||'',material:d.material||'A36',labor:d.labor||{}}});
+    rows.push({quote_id:currentQuoteId,sort_order:sort++,item_type:'detail_meta',description:d.name,qty:1,unit_price:0,total_price:0,source:'manual',item_data:{detail_idx:di,miters:d.miters,holes:d.holes,adjustment:d.adjustment,quantity:d.quantity,notes:d.notes,detailOverridePrice:d.detailOverridePrice||'',material:d.material||'A36',labor:d.labor||{},award_status:d.awardStatus||'won',award_at:d.awardAt||null,award_by:d.awardBy||null,award_reason:d.awardReason||''}});
     d.items.forEach(item=>{
       const{unitPrice}=priceItem(item, false, d.material||'A36');
       const qty=parseInt(item.qty)||1;
@@ -2673,6 +2681,7 @@ async function generateOrderReport() {
     const detailNum = String(di+1).padStart(2,'0');
     const allItems = detail.items || [];
     const allOther = detail.otherItems || [];
+    if ((detail.awardStatus||'won') === 'not_awarded') return; // partial award: skip not-awarded details
     // Skip details with nothing at all
     if (!allItems.length && !allOther.length) return;
 
@@ -2856,6 +2865,23 @@ function markWon(){
   document.getElementById('won-po').value = q?.po_number || '';
   document.getElementById('won-due').value = q?.due_date ? q.due_date.substring(0,10) : '';
   document.getElementById('won-err').textContent = '';
+  // Awarded-details checklist (all checked by default; shown only when >1 real detail)
+  const awardable = details.filter(d => (d.name||'').trim() || d.items.length || d.otherItems.length);
+  const sec = document.getElementById('won-detail-section');
+  const list = document.getElementById('won-detail-list');
+  if (list) {
+    list.innerHTML = awardable.map(d => {
+      const idx = details.indexOf(d);
+      const t = calcDetailTotal(d).total;
+      const checked = (d.awardStatus||'won') !== 'not_awarded';
+      return `<label style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer;">
+        <input type="checkbox" data-idx="${idx}" ${checked?'checked':''} style="cursor:pointer;">
+        <span style="flex:1;">${esc(d.name||('Detail '+(idx+1)))}</span>
+        <span style="color:var(--text2);font-family:var(--font);">${fmt(t)}</span>
+      </label>`;
+    }).join('');
+  }
+  if (sec) sec.style.display = awardable.length > 1 ? 'block' : 'none';
   document.getElementById('won-modal').classList.add('open');
   setTimeout(()=>document.getElementById('won-po').focus(),80);
 }
@@ -2868,16 +2894,33 @@ async function confirmWon(){
   const errEl = document.getElementById('won-err');
   if(!po){ errEl.textContent='PO Number is required.'; return; }
   errEl.textContent='Saving…';
+  const nowIso = new Date().toISOString();
+  // Apply the awarded-details checklist. Unchecked => not_awarded (keeps its price, skipped downstream).
+  const boxes = document.querySelectorAll('#won-detail-list input[type="checkbox"]');
+  boxes.forEach(cb => {
+    const d = details[+cb.dataset.idx];
+    if (!d) return;
+    d.awardStatus = cb.checked ? 'won' : 'not_awarded';
+    if (cb.checked) { d.awardAt = nowIso; d.awardBy = currentProfile?.id || null; }
+  });
+  // Awarded total = sum of won details + all quote-level items
+  let awarded = 0;
+  details.forEach(d => { if ((d.awardStatus||'won') !== 'not_awarded') awarded += calcDetailTotal(d).total; });
+  for (const q of quoteLevelItems) awarded += (parseFloat(q.unitPrice)||0)*(parseInt(q.qty)||1);
+  // Persist award_status into the detail rows before marking the quote won
+  await saveItems();
   const patch = {
     won: true,
-    won_at: new Date().toISOString(),
+    won_at: nowIso,
     po_number: po,
-    due_date: due || null
+    due_date: due || null,
+    awarded_total: +awarded.toFixed(2)
   };
   const{error}=await sbDB.from('quotes').update(patch).eq('id',currentQuoteId);
   if(error){ errEl.textContent='Error: '+error.message; return; }
   closeWonModal();
-  toast('Marked as Won ✓ — PO: '+po,'ok');
+  const naCount = details.filter(d => (d.awardStatus||'won')==='not_awarded').length;
+  toast('Marked as Won ✓ — PO: '+po + (naCount?` (${naCount} detail(s) not awarded)`:''),'ok');
   await loadQuotes();
   await openQuote(currentQuoteId);
 }
@@ -3717,6 +3760,7 @@ async function loadPendingDispatch() {
     const allDetailKeys = Object.keys(detailMap).sort((a,b) => parseInt(a)-parseInt(b));
     for (const di of allDetailKeys) {
       const d = detailMap[di];
+      if (d.meta && d.meta.item_data && d.meta.item_data.award_status === 'not_awarded') continue; // skip not-awarded details
       const allItems = [...d.items, ...d.otherItems];
       if (!allItems.length && !d.meta) continue;
       const detailNum = String(parseInt(di)+1).padStart(2,'0');
