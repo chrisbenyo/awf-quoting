@@ -71,7 +71,7 @@ export default async (req) => {
   const limit = url.searchParams.get("limit") ?? "500";
   try {
     const sbRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,created_at,status,won,po_number,won_at&created_at=gte.${since}&order=created_at.desc&limit=${limit}`,
+      `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,awarded_total,cancelled_at,created_at,status,won,po_number,won_at&created_at=gte.${since}&order=created_at.desc&limit=${limit}`,
       { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
     );
     const data = await sbRes.json();
