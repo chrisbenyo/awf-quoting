@@ -448,6 +448,7 @@ table.bom select option{background:var(--surface2);}
         <button class="filter-tab" onclick="setFilter('rejected',this)">Rejected</button>
         <button class="filter-tab" onclick="setFilter('sent',this)">Sent</button>
         <button class="filter-tab" onclick="setFilter('won',this)" style="color:var(--green)">Won</button>
+        <button class="filter-tab" onclick="setFilter('cancelled',this)" style="color:var(--red)">Cancelled</button>
         <button class="filter-tab" onclick="setFilter('trash',this)" style="color:var(--red)">🗑 Trash</button>
       </div>
     </div>
@@ -1566,9 +1567,10 @@ let currentSortOrder='updated_at.desc';
 async function setSortOrder(val){ currentSortOrder=val; loadQuotes(); }
 async function loadQuotes(){
   const[col,dir]=currentSortOrder.split('.');
-  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,created_at,user_id,review_note,submitted_at,won,po_number,due_date,won_at,deleted_at').order(col,{ascending:dir==='asc',nullsFirst:false});
+  let q=sbDB.from('quotes').select('id,number,customer_name,customer_quote_num,location,lead_time_weeks,terms,notes,status,total_price,updated_at,created_at,user_id,review_note,submitted_at,won,po_number,due_date,won_at,deleted_at,cancelled_at,cancel_reason').order(col,{ascending:dir==='asc',nullsFirst:false});
   if(filterStatus==='won') q=q.eq('won',true);
   else if(filterStatus==='trash'){/* no server filter — handled client-side */}
+  else if(filterStatus==='cancelled'){/* no server filter — handled client-side */}
   else if(filterStatus!=='all') {
     q=q.eq('status',filterStatus);
     if(filterStatus==='sent') q=q.eq('won',false);
@@ -1580,9 +1582,13 @@ async function loadQuotes(){
     // Only deleted quotes within 30-day retention; sort newest-deleted first
     quotes=(data||[]).filter(x=>x.deleted_at && new Date(x.deleted_at).getTime()>thirtyDaysAgo)
       .sort((a,b)=>new Date(b.deleted_at)-new Date(a.deleted_at));
+  } else if(filterStatus==='cancelled'){
+    // Cancelled orders; newest-cancelled first
+    quotes=(data||[]).filter(x=>x.cancelled_at && !x.deleted_at)
+      .sort((a,b)=>new Date(b.cancelled_at)-new Date(a.cancelled_at));
   } else {
-    // Hide deleted from all normal views
-    quotes=(data||[]).filter(x=>!x.deleted_at);
+    // Hide deleted AND cancelled from all normal views
+    quotes=(data||[]).filter(x=>!x.deleted_at && !x.cancelled_at);
   }
   renderSidebar();
 }
@@ -1636,7 +1642,7 @@ function renderSidebar(){
       <div class="qi-num">#${q.number}${q.customer_quote_num ? ` <span style="font-size:9px;color:var(--text3)">${q.customer_quote_num}</span>` : ``}${q.po_number?` <span style="font-size:9px;color:var(--text3);font-family:var(--font)">${q.po_number}</span>`:''}</div>
       <div class="qi-customer">${q.customer_name||'No customer'}</div>
       <div class="qi-meta">
-        <span><span class="sdot sdot-${q.status}"></span>${q.status}${q.won?' ✓ Won':''}</span>
+        <span><span class="sdot sdot-${q.status}"></span>${q.status}${q.won?' ✓ Won':''}${q.cancelled_at?' <span style="color:var(--red)">✕ cancelled</span>':''}</span>
         <span style="display:flex;gap:6px;align-items:center;">
           ${dateStr?`<span style="color:var(--text3);font-size:10px;">${dateStr}</span>`:''}
           <span>${fmt(q.total_price||0)}</span>
@@ -2365,7 +2371,13 @@ function renderWorkflowActions(q, isAdmin, isOwner, locked) {
     html += `<button class="btn btn-ghost btn-sm" onclick="generateOrderReport()" style="border-color:var(--amber);color:var(--amber)">📋 Order Report</button>`;
   } else if (status === 'sent') {
     if(q.won){
-      html += `<span style="color:var(--green);font-family:var(--font);font-size:12px">✓ WON</span>`;
+      if(q.cancelled_at){
+        html += `<span style="color:var(--red);font-family:var(--font);font-size:12px">✕ ORDER CANCELLED</span>`;
+        html += `<button class="btn btn-ghost btn-sm" onclick="reactivateQuote()" style="border-color:var(--green);color:var(--green)">↺ Reactivate</button>`;
+      } else {
+        html += `<span style="color:var(--green);font-family:var(--font);font-size:12px">✓ WON</span>`;
+        html += `<button class="btn btn-ghost btn-sm" onclick="cancelQuote()" style="border-color:var(--red);color:var(--red)">✕ Cancel Order</button>`;
+      }
     } else {
       html += `<span class="workflow-hint">✓ Sent to customer</span>`;
       html += `<button class="btn btn-success btn-sm" onclick="markWon()">✓ Mark as Won</button>`;
@@ -2887,6 +2899,35 @@ function markWon(){
 }
 function closeWonModal(){
   document.getElementById('won-modal').classList.remove('open');
+}
+async function cancelQuote(){
+  if(!currentQuoteId) return;
+  // Warn if the order has already been dispatched to the floor
+  const {data:jobs} = await sbDB.from('shop_jobs').select('id').eq('quote_id',currentQuoteId);
+  const dispatched = (jobs||[]).length;
+  const msg = dispatched
+    ? `This order has ${dispatched} detail(s) already dispatched to the floor. Cancelling marks those jobs cancelled so the shop stops.\n\nReason (optional):`
+    : `Cancel this order?\n\nReason (optional):`;
+  const reason = window.prompt(msg, '');
+  if(reason===null) return;
+  const nowIso = new Date().toISOString();
+  const {error} = await sbDB.from('quotes').update({cancelled_at:nowIso, cancel_reason:reason||null, reactivated_at:null, odoo_sync_status:'cancel_pending'}).eq('id',currentQuoteId);
+  if(error){ toast('Error cancelling: '+error.message,'err'); return; }
+  await sbDB.from('shop_jobs').update({cancelled_at:nowIso, cancelled_by:currentProfile?.id||null}).eq('quote_id',currentQuoteId);
+  toast('Order cancelled ✓','ok');
+  await loadQuotes();
+  await openQuote(currentQuoteId);
+}
+async function reactivateQuote(){
+  if(!currentQuoteId) return;
+  if(!window.confirm('Reactivate this cancelled order?')) return;
+  const nowIso = new Date().toISOString();
+  const {error} = await sbDB.from('quotes').update({cancelled_at:null, reactivated_at:nowIso, odoo_sync_status:null}).eq('id',currentQuoteId);
+  if(error){ toast('Error: '+error.message,'err'); return; }
+  await sbDB.from('shop_jobs').update({cancelled_at:null, cancelled_by:null}).eq('quote_id',currentQuoteId);
+  toast('Order reactivated ✓','ok');
+  await loadQuotes();
+  await openQuote(currentQuoteId);
 }
 async function confirmWon(){
   const po = document.getElementById('won-po').value.trim();
@@ -3628,8 +3669,9 @@ async function loadFloorBoard() {
   if (kanban)  kanban.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading floor data…</div>';
   try {
     // Fetch dispatched jobs
-    const { data: jobs, error: jobErr } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
+    const { data: jobsRaw, error: jobErr } = await sbDB.from('shop_jobs').select('*').order('due_date',{ascending:true,nullsFirst:false});
     if (jobErr) throw jobErr;
+    const jobs = (jobsRaw||[]).filter(j => !j.cancelled_at); // hide cancelled jobs
     if (!jobs || !jobs.length) {
       if (statRow) statRow.innerHTML = '';
       if (kanban)  kanban.innerHTML  = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor.</div>';
@@ -3711,10 +3753,11 @@ async function loadPendingDispatch() {
   panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div>';
 
   // 1. All won quotes with a PO number
-  const { data: wonQuotes, error } = await sbDB.from('quotes')
-    .select('id,number,customer_name,po_number,due_date,won,status,won_at')
+  const { data: wonQuotesRaw, error } = await sbDB.from('quotes')
+    .select('id,number,customer_name,po_number,due_date,won,status,won_at,cancelled_at')
     .eq('won', true);
   if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading quotes.</div>'; return; }
+  const wonQuotes = (wonQuotesRaw||[]).filter(q => !q.cancelled_at); // exclude cancelled orders from dispatch
 
   // 2. Already-dispatched (quote_id, detail_number) pairs — use quote_id for null-safe matching
   const { data: dispatched } = await sbDB.from('shop_jobs').select('*');
@@ -4220,10 +4263,11 @@ async function loadActiveJobs() {
   panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div>';
 
   // Get all dispatched jobs
-  const { data: jobs, error } = await sbDB.from('shop_jobs')
+  const { data: jobsRaw, error } = await sbDB.from('shop_jobs')
     .select('*')
     .order('due_date', {ascending: true, nullsFirst: false});
   if (error) { panel.innerHTML = '<div style="color:var(--red)">Error loading jobs.</div>'; return; }
+  const jobs = (jobsRaw||[]).filter(j => !j.cancelled_at); // hide cancelled jobs
   if (!jobs || !jobs.length) {
     panel.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:20px 0;">No active jobs on the floor yet.</div>';
     return;
