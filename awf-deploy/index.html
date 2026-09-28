@@ -2400,7 +2400,44 @@ function renderWorkflowActions(q, isAdmin, isOwner, locked) {
 // SAVE
 // ============================================================
 let saveHeaderTimer=null, saveItemsTimer=null;
+// ── Stale-tab guard: detect a newer deploy and PAUSE saves from an out-of-date tab ──
+// (A tab left open across a deploy runs old code; its delete+reinsert saveItems would
+//  silently overwrite good data. We detect the new deploy via the index.html ETag and
+//  block saves until the user reloads fresh code.)
+let __deployTag=null, __appStale=false;
+async function __fetchDeployTag(){
+  try{
+    const url=location.pathname.replace(/[^/]*$/,'')+'index.html?_v='+Date.now();
+    const r=await fetch(url,{method:'HEAD',cache:'no-store'});
+    return r.headers.get('etag')||r.headers.get('last-modified')||null;
+  }catch(e){ return null; }
+}
+async function __checkDeploy(){
+  const tag=await __fetchDeployTag();
+  if(!tag) return;
+  if(__deployTag===null){ __deployTag=tag; return; }
+  if(tag!==__deployTag){ __appStale=true; __showStaleBanner(); }
+}
+function __showStaleBanner(){
+  if(document.getElementById('stale-banner')) return;
+  const b=document.createElement('div');
+  b.id='stale-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:var(--red,#8a1a1a);color:#fff;font-family:var(--sans,sans-serif);font-size:14px;padding:10px 16px;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.45);';
+  b.innerHTML='<span>\u26A0 A newer version of the app is available. Saving is paused on this tab to protect your data \u2014 reload to continue.</span>';
+  const btn=document.createElement('button');
+  btn.textContent='Reload now';
+  btn.style.cssText='background:#fff;color:#8a1a1a;border:none;border-radius:6px;padding:6px 14px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;';
+  btn.onclick=function(){ location.href=location.pathname+'?_v='+Date.now(); };
+  b.appendChild(btn);
+  document.body.appendChild(b);
+}
+window.addEventListener('load',function(){
+  __checkDeploy();
+  setInterval(__checkDeploy,60000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) __checkDeploy(); });
+});
 function schedSave(itemsChanged=false){
+  if(__appStale){ __showStaleBanner(); return; }
   clearTimeout(saveHeaderTimer);
   clearTimeout(saveItemsTimer);
   const el=document.getElementById('save-status');if(el) el.textContent='Unsaved…';
@@ -2432,6 +2469,7 @@ function buildHeaderPatch(){
 }
 async function saveHeader(){
   if(!currentQuoteId) return;
+  if(__appStale){ __showStaleBanner(); return; }
   // Check session is still valid before saving
   const{data:{session}}=await sbAuth.getSession();
   if(!session){
@@ -2457,6 +2495,7 @@ async function saveHeader(){
 }
 async function saveItems(){
   if(!currentQuoteId) return;
+  if(__appStale){ __showStaleBanner(); return; }
   const el=document.getElementById('save-status');if(el) el.textContent='Saving items…';
   // Check session before proceeding
   const{data:{session}}=await sbAuth.getSession();
