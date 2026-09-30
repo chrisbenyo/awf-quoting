@@ -3237,6 +3237,27 @@ async function handlePdfFiles(fileList) {
   renderPdfDetailsPreview();
 }
 
+// Robustly pull EVERY complete top-level JSON array out of the model reply and merge
+// their elements into one list, respecting strings/escapes so a "]" inside a value never
+// ends an array early. Handles: one array, several arrays back-to-back, or an array
+// followed by stray prose — the cases a first-[-to-last-] slice choked on.
+function extractBomArrays(text){
+  const src = String(text).replace(/```json|```/g, '');
+  const out = []; let i = 0; const n = src.length;
+  while (i < n) {
+    if (src[i] !== '[') { i++; continue; }
+    let depth = 0, inStr = false, esc = false, j = i;
+    for (; j < n; j++) {
+      const c = src[j];
+      if (inStr) { if (esc) esc=false; else if (c==='\\') esc=true; else if (c==='"') inStr=false; }
+      else { if (c==='"') inStr=true; else if (c==='[') depth++; else if (c===']'){ depth--; if(depth===0){ j++; break; } } }
+    }
+    try { const arr = JSON.parse(src.slice(i, j)); if (Array.isArray(arr)) { for (const el of arr) out.push(el); i = j; continue; } }
+    catch(e){}
+    i++;
+  }
+  return out;
+}
 async function parsePdfBOM(file) {
   // Convert PDF to base64
   const base64 = await new Promise((resolve, reject) => {
@@ -3302,17 +3323,14 @@ async function parsePdfBOM(file) {
   if (!response.ok) throw new Error('API returned ' + response.status);
   const data = await response.json();
   const text = data.content?.[0]?.text || '';
-  // Strip any markdown and find the JSON array
-  let clean = text.replace(/```json|```/g, '').trim();
-  // Find first [ and last ] to extract just the JSON array
-  const firstBracket = clean.indexOf('[');
-  const lastBracket = clean.lastIndexOf(']');
-  if (firstBracket === -1 || lastBracket === -1) {
-    throw new Error('No JSON array in response. Got: ' + clean.slice(0, 100));
+  // Extract EVERY complete top-level JSON array and merge their elements. The model
+  // sometimes returns multiple arrays (e.g. one per BOM table) or an array followed by
+  // stray prose; a naive first-[-to-last-] slice glued them into invalid JSON and threw
+  // "Unexpected non-whitespace character after JSON". extractBomArrays tolerates all that.
+  const parsed = extractBomArrays(text);
+  if (!Array.isArray(parsed) || !parsed.length) {
+    throw new Error('No JSON array in response. Got: ' + text.replace(/```json|```/g,'').trim().slice(0, 120));
   }
-  clean = clean.slice(firstBracket, lastBracket + 1);
-  const parsed = JSON.parse(clean);
-  if (!Array.isArray(parsed)) throw new Error('Unexpected response format');
   return parsed;
 }
 
