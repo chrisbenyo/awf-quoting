@@ -1,8 +1,12 @@
 # AWOS / "Quote-to-Floor" — engineering context
 
+@../awos-docs/CLAUDE.md
+
+_The import above pulls in the shared business, tenant, auth, schema and roadmap context from the private `awos-docs` repo (clone it next to this one). Code-location lookups: `../awos-docs/CODEMAP.md`._
+
 Standing context for **AWOS**, branded **Quote-to-Floor** (`quotetofloor.com`): a managed-SaaS quoting + shop-floor system owned by **Chris Benyo** of **All Weld & Fabricating (AWF)**, a steel fab shop. This file is auto-loaded by Claude Code — read it before touching any AWOS repo so a session starts already knowing the app.
 
-> This repo's work moved from the Claude desktop "Cowork task" surface to **Claude Code** (Oct 2026). The big practical change: **in Claude Code you can `git push` and use the GitHub CLI directly** — the browser/CodeMirror deploy dance described at the bottom is the LEGACY method from the old surface, kept only as a fallback.
+> This repo's work moved from the Claude desktop "Cowork task" surface to **Claude Code** (Sep 2026). The big practical change: **in Claude Code you can `git push` and use the GitHub CLI directly** — the browser/CodeMirror deploy dance described at the bottom is the LEGACY method from the old surface, kept only as a fallback.
 
 ## Accounts & access (hard to re-derive — keep current)
 
