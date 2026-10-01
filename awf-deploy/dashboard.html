@@ -497,7 +497,7 @@ async function loadLive() {
           </div>`;
         }).join('');
 
-    document.getElementById('paceTitle').textContent = `April pace — day ${today}/${DAYS_IN_MONTH}`;
+    document.getElementById('paceTitle').textContent = `${CUR_MONTH_NAME} pace — day ${today}/${DAYS_IN_MONTH}`;
     // Split-time pace: month + today
     const todayStart=new Date(CUR_YEAR,CUR_MONTH,today,0,0,0);
     const quotesToday=allLive.filter(q=>new Date(q.created_at)>=todayStart).reduce((s,q)=>s+dashVal(q),0);
