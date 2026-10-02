@@ -4605,6 +4605,27 @@ async function saveAllStageChanges() {
   const initials = currentProfile?.full_name?.split(' ').map(n=>n[0]).join('') || 'OFC';
   const note = `Office batch update (${count} jobs)`;
   const events = [];
+
+  // Auto-checkout (same rule as the floor tablets): moving a job closes any check-in
+  // still open at another station. SAW and BURN run in parallel and don't close each other.
+  const runsInParallel = (a, b) => ['SAW','BURN'].includes(a) && ['SAW','BURN'].includes(b);
+  const priorEvents = await sbFetchByIds('shop_events', 'shop_job_id,station,event_type,created_at',
+    [..._pendingStageChanges.keys()], 'shop_job_id');
+  priorEvents.sort((a,b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1
+    : (a.event_type === 'checkout') - (b.event_type === 'checkout'));
+  const lastByJob = {};
+  for (const ev of priorEvents) (lastByJob[ev.shop_job_id] ||= {})[ev.station] = ev.event_type;
+
+  _pendingStageChanges.forEach((change, jobId) => {
+    const last = lastByJob[jobId] || {};
+    Object.keys(last).filter(s => last[s] === 'checkin' && s !== change.newStage && !runsInParallel(s, change.newStage))
+      .forEach(s => events.push({
+        shop_job_id: jobId, po_number: change.po || null, detail_number: change.det || null,
+        station: s, tablet_station: change.newStage, operator_initials: initials,
+        event_type: 'checkout', notes: `auto: moved to ${change.newStage}`
+      }));
+  });
+
   _pendingStageChanges.forEach((change, jobId) => {
     const base = {
       shop_job_id:       jobId,
