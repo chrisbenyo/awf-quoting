@@ -923,15 +923,32 @@ class QueryBuilder {
       return;
     }
     // SELECT
+    // Supabase caps every response at 1000 rows (max-rows) and silently drops the rest.
+    // Unless .single() or a .limit() <= PAGE was asked for, page through with offset.
     try {
-      let url = `/rest/v1/${this._table}?select=${encodeURIComponent(this._select)}`;
-      for (const f of this._filters) url += '&' + f;
-      if (this._order) url += '&order=' + this._order;
-      if (this._limit) url += '&limit=' + this._limit;
+      const PAGE = 1000;
+      let base = `/rest/v1/${this._table}?select=${encodeURIComponent(this._select)}`;
+      for (const f of this._filters) base += '&' + f;
       const headers = {};
       if (this._single) headers['Accept'] = 'application/vnd.pgrst.object+json';
-      const data = await sbFetch(url, {headers});
-      resolve({data, error: null});
+      let url = base;
+      if (this._order) url += '&order=' + this._order;
+      if (this._limit) url += '&limit=' + Math.min(this._limit, PAGE);
+      const first = await sbFetch(url, {headers});
+      if (this._single || !Array.isArray(first) || first.length < PAGE || (this._limit && this._limit <= PAGE)) {
+        resolve({data: first, error: null});
+        return;
+      }
+      // More rows exist. Offset paging needs a stable order, so re-read from the start with id as tiebreaker.
+      const order = this._order ? `${this._order},id.asc` : 'id.asc';
+      const max = this._limit || Infinity;
+      const all = [];
+      for (let offset = 0; offset < max; offset += PAGE) {
+        const page = await sbFetch(`${base}&order=${order}&limit=${Math.min(PAGE, max - offset)}&offset=${offset}`, {headers});
+        all.push(...page);
+        if (page.length < PAGE) break;
+      }
+      resolve({data: all, error: null});
     } catch(e) {
       resolve({data: null, error: e});
     }
