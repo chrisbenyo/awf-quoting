@@ -68,15 +68,25 @@ export default async (req) => {
   }
 
   const since = url.searchParams.get("since") ?? "2026-04-17T00:00:00";
-  const limit = url.searchParams.get("limit") ?? "500";
+  const limit = parseInt(url.searchParams.get("limit") ?? "500", 10);
   try {
-    const sbRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,awarded_total,cancelled_at,created_at,status,won,po_number,won_at&created_at=gte.${since}&order=created_at.desc&limit=${limit}`,
-      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
-    );
-    const data = await sbRes.json();
+    // Supabase returns at most 1000 rows per request and silently drops the rest,
+    // so page through until we have `limit` rows or run out.
+    const PAGE = 1000;
+    const data = [];
+    let status = 200;
+    for (let offset = 0; offset < limit; offset += PAGE) {
+      const sbRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/quotes?select=id,customer_name,total_price,awarded_total,cancelled_at,created_at,status,won,po_number,won_at&created_at=gte.${since}&order=created_at.desc,id.desc&limit=${Math.min(PAGE, limit - offset)}&offset=${offset}`,
+        { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+      );
+      const page = await sbRes.json();
+      if (!sbRes.ok) { return new Response(JSON.stringify(page), { status: sbRes.status, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }); }
+      data.push(...page);
+      if (page.length < Math.min(PAGE, limit - offset)) break;
+    }
     return new Response(JSON.stringify(data), {
-      status: sbRes.status,
+      status,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
     });
   } catch (e) {

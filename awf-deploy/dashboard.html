@@ -361,8 +361,8 @@ async function loadLive() {
     const now = new Date();
     const today = now.getDate();
 
-    const res = await fetch(`${PROXY}?since=${SINCE}&limit=500`);
-    const resAll = await fetch(`${PROXY}?since=2026-01-01T00:00:00&limit=1000`);
+    const res = await fetch(`${PROXY}?since=${SINCE}&limit=5000`);
+    const resAll = await fetch(`${PROXY}?since=2026-01-01T00:00:00&limit=20000`);
     const allLive = await res.json();
     if (!Array.isArray(allLive)) throw new Error(JSON.stringify(allLive));
     const allYear = await resAll.json().catch(()=>[]);
