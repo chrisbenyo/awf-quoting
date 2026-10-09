@@ -93,7 +93,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <a href="https://quotes.allweldfab.com" class="nav-link">→ Quoting app</a>
     <a href="https://shopfloor.allweldfab.com" class="nav-link">→ Shop floor</a>
     <span class="live-badge"><span class="live-dot"></span>live</span>
-    <button class="refresh-btn" onclick="loadLive()">↻ Refresh</button>
+    <button class="refresh-btn" onclick="loadLive();loadShopCycle()">↻ Refresh</button>
   </div>
 </div>
 
@@ -174,6 +174,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
   <div class="card">
     <div class="card-title" id="paceTitle">-- pace</div>
     <div id="paceContent"><div class="empty-state">Loading...</div></div>
+  </div>
+</div>
+
+<div class="chart-row">
+  <div class="card">
+    <div class="card-title">Shop cycle time — dispatch to shipped</div>
+    <div style="font-size:11px;color:var(--text3);margin:-6px 0 10px;">Median working days (weekends excluded) by month shipped · tablet-scanned details only · lower is better</div>
+    <div style="position:relative;height:200px;"><canvas id="cycleChart" role="img" aria-label="Median working days from dispatch to shipped, by month"></canvas></div>
+    <table class="win-table" id="cycleTable" style="margin-top:12px;"></table>
+  </div>
+  <div class="card">
+    <div class="card-title">Median dwell by station (days)</div>
+    <div style="font-size:11px;color:var(--text3);margin:-6px 0 10px;">Check-in until the part moves on · by month checked in · hover for count · faded = fewer than 5 parts</div>
+    <div id="dwellTable"><div class="empty-state">Loading...</div></div>
   </div>
 </div>
 
@@ -545,6 +559,94 @@ async function loadLive() {
 }
 
 loadLive();
+
+// ── SHOP CYCLE TIME ─────────────────────────────────────────────────────────
+// Directional, not billable: times include nights, weekends and cart waits.
+// Only details scanned SHIPPED on a tablet count — office batch updates and
+// same-hour dispatch+ship entries carry catch-up dates, not real ship dates.
+let cycleChart = null;
+const median = a => { if (!a.length) return null; const s = [...a].sort((x,y)=>x-y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m-1] + s[m]) / 2; };
+const ymKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const ymLabel = k => { const [y,m] = k.split('-'); return new Date(+y, +m-1, 1).toLocaleString('default',{month:'short'}); };
+function workDaysBetween(a, b) {   // weekdays after a's date up to and including b's date
+  let n = 0; const d = new Date(a.getFullYear(), a.getMonth(), a.getDate()), end = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+  while (d < end) { d.setDate(d.getDate()+1); const w = d.getDay(); if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+const isOffice = e => (e.notes || '').startsWith('Office batch');
+
+async function loadShopCycle() {
+  try {
+    const res = await fetch(`${PROXY}?shop=1`);
+    const { jobs, events, error } = await res.json();
+    if (error) throw new Error(error);
+
+    const byJob = {};
+    for (const e of events) (byJob[e.shop_job_id] ||= []).push(e);
+
+    // 1. Dispatch → shipped, per month shipped
+    const months = {};
+    for (const j of jobs) {
+      if (j.cancelled_at || !j.dispatched_at) continue;
+      const evs = byJob[j.id] || [];
+      const ship = evs.find(e => e.station === 'SHIPPED' && e.event_type === 'checkin');
+      if (!ship || isOffice(ship)) continue;
+      const t0 = new Date(j.dispatched_at), t1 = new Date(ship.created_at);
+      if (t1 - t0 < 3600e3) continue;                      // same-hour = data entry, not real flow
+      const m = (months[ymKey(t1)] ||= { work: [], cal: [], due: 0, onTime: 0 });
+      m.work.push(workDaysBetween(t0, t1));
+      m.cal.push((t1 - t0) / 864e5);
+      if (j.due_date) { m.due++; if (`${ymKey(t1)}-${String(t1.getDate()).padStart(2,"0")}` <= j.due_date.slice(0,10)) m.onTime++; }
+    }
+    const keys = Object.keys(months).sort();
+    const vals = keys.map(k => median(months[k].work));
+    if (cycleChart) cycleChart.destroy();
+    cycleChart = new Chart(document.getElementById('cycleChart'), {
+      type: 'bar',
+      data: { labels: keys.map(ymLabel), datasets: [{ data: vals, backgroundColor: '#2dd4bf', borderRadius: 4, maxBarThickness: 36 }] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: {
+          title: it => ymLabel(keys[it[0].dataIndex]) + ' ' + keys[it[0].dataIndex].slice(0,4),
+          label: it => { const m = months[keys[it.dataIndex]]; return [`${it.raw} working days (median)`, `${Math.round(median(m.cal))} calendar days`, `${m.work.length} details shipped`]; } } } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8b8fa8' } },
+          y: { beginAtZero: true, grid: { color: '#2e3248' }, ticks: { color: '#8b8fa8' }, title: { display: true, text: 'working days', color: '#5a5d72' } }
+        }
+      }
+    });
+    document.getElementById('cycleTable').innerHTML =
+      `<tr><th>Month</th><th style="text-align:right">Details</th><th style="text-align:right">Work days</th><th style="text-align:right">Cal days</th><th style="text-align:right">On time</th></tr>` +
+      keys.map(k => { const m = months[k]; return `<tr><td>${ymLabel(k)} ${k.slice(2,4)}</td><td style="text-align:right">${m.work.length}</td><td style="text-align:right">${median(m.work)}</td><td style="text-align:right">${Math.round(median(m.cal))}</td><td style="text-align:right">${m.due ? Math.round(100*m.onTime/m.due)+'%' : '—'}</td></tr>`; }).join('');
+
+    // 2. Dwell per station: check-in until checked out there, or checked in somewhere else
+    const STATIONS = ['SAW','BURN','FIT','WELD','CLEAN','PRIME','SANDBLAST','SHIP'];
+    const dwell = {};                                        // station → month → [days]
+    for (const evs of Object.values(byJob)) {
+      evs.forEach((e, i) => {
+        if (e.event_type !== 'checkin' || !STATIONS.includes(e.station) || isOffice(e)) return;
+        const out = evs.slice(i+1).find(o => (o.station === e.station && o.event_type === 'checkout') || (o.station !== e.station && o.event_type === 'checkin'));
+        if (!out) return;                                    // still there
+        const t = new Date(e.created_at);
+        ((dwell[e.station] ||= {})[ymKey(t)] ||= []).push((new Date(out.created_at) - t) / 864e5);
+      });
+    }
+    const now = new Date(), cols = [];
+    for (let i = 5; i >= 0; i--) cols.push(ymKey(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+    const all = STATIONS.flatMap(s => cols.map(c => (dwell[s]?.[c] || []).length >= 5 ? median(dwell[s][c]) : 0));
+    const maxV = Math.max(1, ...all);
+    document.getElementById('dwellTable').innerHTML =
+      `<table class="win-table"><tr><th>Station</th>${cols.map(c => `<th style="text-align:center">${ymLabel(c)}</th>`).join('')}</tr>` +
+      STATIONS.filter(s => dwell[s]).map(s => `<tr><td>${s}</td>${cols.map(c => {
+        const a = dwell[s][c] || []; if (!a.length) return `<td style="text-align:center;color:var(--text3)">·</td>`;
+        const v = median(a), thin = a.length < 5, op = thin ? 0 : 0.12 + 0.6 * Math.min(1, v / maxV);
+        return `<td title="${a.length} part${a.length>1?'s':''}" style="text-align:center;background:rgba(45,212,191,${op.toFixed(2)});${thin?'color:var(--text3);':''}">${v < 10 ? v.toFixed(1) : Math.round(v)}</td>`;
+      }).join('')}</tr>`).join('') + `</table>`;
+  } catch (e) {
+    document.getElementById('dwellTable').innerHTML = `<div class="empty-state">Could not load shop data: ${e.message}</div>`;
+  }
+}
+loadShopCycle();
 </script>
 </body>
 </html>

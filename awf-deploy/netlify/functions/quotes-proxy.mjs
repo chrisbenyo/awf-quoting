@@ -67,6 +67,36 @@ export default async (req) => {
     });
   }
 
+  // Shop cycle-time data for the dashboard: every shop job + every scan event, paged past the 1000-row cap.
+  if (url.searchParams.get("shop")) {
+    const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
+    const pageAll = async (path) => {
+      const rows = [];
+      for (let offset = 0; ; offset += 1000) {
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1000&offset=${offset}`, { headers });
+        if (!r.ok) throw new Error(`${path}: ${r.status} ${await r.text()}`);
+        const page = await r.json();
+        rows.push(...page);
+        if (page.length < 1000) return rows;
+      }
+    };
+    try {
+      const [jobs, events] = await Promise.all([
+        pageAll("shop_jobs?select=id,dispatched_at,due_date,cancelled_at&order=id"),
+        pageAll("shop_events?select=shop_job_id,station,event_type,created_at,notes&shop_job_id=not.is.null&order=created_at,id"),
+      ]);
+      return new Response(JSON.stringify({ jobs, events }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },
+      });
+    } catch (e) {
+      return new Response(JSON.stringify({ error: e.message }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+  }
+
   const since = url.searchParams.get("since") ?? "2026-04-17T00:00:00";
   const limit = parseInt(url.searchParams.get("limit") ?? "500", 10);
   try {
