@@ -33,7 +33,7 @@ async function loadShopData(proxy) {
 
 // → { months: {ym: {work, cal, due, onTime, green, yellow, red, scanned:{SAW:n,…}}}, dwell: {station: {ym: [workdays]}},
 //     dispatch: {ym: {wd:[], green, yellow, red}}   (won → dispatched, by month dispatched),
-//     waiting: {n, orders, ages:[], green, yellow, red, oldest:{number,customer,days}} | null }
+//     waiting: {n (orders), ages:[], green, yellow, red, oldest:{number,customer,days}} | null }
 function computeShopMetrics({ jobs, events, wonAt = {}, waiting: waitingRaw = null }) {
   // Won → dispatched (office), per detail, bucketed by month dispatched
   const dispatch = {};
@@ -44,11 +44,11 @@ function computeShopMetrics({ jobs, events, wonAt = {}, waiting: waitingRaw = nu
     m.wd.push(wd);
     m[shopGrade(wd, SHOP_DISPATCH_TARGET)]++;
   }
-  // Won details waiting to be dispatched right now
+  // Won orders waiting to be dispatched right now (nothing dispatched yet)
   let waiting = null;
   if (waitingRaw) {
     const now = new Date();
-    waiting = { n: waitingRaw.length, orders: new Set(waitingRaw.map(w => w.number)).size, ages: [], green: 0, yellow: 0, red: 0, oldest: null };
+    waiting = { n: waitingRaw.length, ages: [], green: 0, yellow: 0, red: 0, oldest: null };
     for (const w of waitingRaw) {
       const days = shopWorkDays(new Date(w.won_at), now);
       waiting.ages.push(days);
