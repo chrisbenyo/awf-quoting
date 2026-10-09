@@ -55,12 +55,17 @@ function computeShopMetrics({ jobs, events }) {
       if (evs.some(e => e.station === s && e.event_type === 'checkin' && !shopIsOffice(e))) m.scanned[s] = (m.scanned[s] || 0) + 1;
   }
 
-  // Dwell per station: check-in until checked out there, or checked in somewhere else
+  // Dwell per station: check-in until checked out there, or until the part is checked in at a
+  // station that ends it. SAW and BURN run in parallel, so a check-in at one doesn't end the other
+  // — same rules as the tablets.
+  const CUT = ['SAW', 'BURN'];
+  const ends = (e, o) => (o.station === e.station && o.event_type === 'checkout')
+    || (o.event_type === 'checkin' && o.station !== e.station && !(CUT.includes(e.station) && CUT.includes(o.station)));
   const dwell = {};
   for (const evs of Object.values(byJob)) {
     evs.forEach((e, i) => {
       if (e.event_type !== 'checkin' || !SHOP_TARGETS[e.station] || shopIsOffice(e)) return;
-      const out = evs.slice(i + 1).find(o => (o.station === e.station && o.event_type === 'checkout') || (o.station !== e.station && o.event_type === 'checkin'));
+      const out = evs.slice(i + 1).find(o => ends(e, o));
       if (!out) return;   // still at the station
       const t = new Date(e.created_at);
       ((dwell[e.station] ||= {})[shopYm(t)] ||= []).push(shopWorkDays(t, new Date(out.created_at)));
