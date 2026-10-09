@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop Scorecard — All Weld Fabrication</title>
+<style>
+  @page { size: letter landscape; margin: 0.4in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #fff; color: #1f2937; font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { max-width: 10.2in; margin: 0 auto; padding: 20px 0; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 14px; }
+  h1 { font-size: 20px; }
+  .sub { color: #6b7280; font-size: 11px; margin-top: 2px; }
+  .actions button { font: inherit; padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .tile { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; }
+  .tile .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+  .tile .val { font-size: 24px; font-weight: 600; margin-top: 2px; }
+  .tile .note { font-size: 10px; color: #6b7280; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  section { break-inside: avoid; margin-bottom: 14px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .hint { font-size: 10px; color: #6b7280; margin-bottom: 6px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid #e5e7eb; padding: 4px 6px; text-align: center; }
+  th { background: #f3f4f6; font-weight: 600; font-size: 11px; }
+  td:first-child, th:first-child { text-align: left; }
+  .g-green  { background: #dcfce7; color: #14532d; }
+  .g-yellow { background: #fef3c7; color: #78350f; }
+  .g-red    { background: #fee2e2; color: #7f1d1d; font-weight: 600; }
+  .thin { opacity: .45; }
+  .muted { color: #9ca3af; }
+  .legend { display: flex; gap: 14px; font-size: 10px; color: #374151; margin: 4px 0 10px; flex-wrap: wrap; }
+  .legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+  .legend .lg::before { background: #dcfce7; border: 1px solid #86efac; }
+  .legend .ly::before { background: #fef3c7; border: 1px solid #fcd34d; }
+  .legend .lr::before { background: #fee2e2; border: 1px solid #fca5a5; }
+  footer { font-size: 9.5px; color: #6b7280; border-top: 1px solid #e5e7eb; padding-top: 6px; line-height: 1.5; }
+  #status { padding: 40px; text-align: center; color: #6b7280; }
+  @media print { .actions { display: none; } .page { padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header>
+    <div>
+      <h1>All Weld Fabrication — Shop Scorecard</h1>
+      <div class="sub" id="asof">Loading shop data…</div>
+    </div>
+    <div class="actions"><button onclick="window.print()">🖨 Print</button></div>
+  </header>
+  <div id="status">Loading…</div>
+  <div id="report" style="display:none">
+    <div class="tiles" id="tiles"></div>
+    <div class="legend"><span class="lg">Green: at or under target</span><span class="ly">Yellow: 1 day over</span><span class="lr">Red: 2+ days over</span><span class="muted">Faded: fewer than 5 parts that month</span></div>
+    <div class="grid">
+      <div>
+        <section>
+          <h2>Dispatch to shipped</h2>
+          <div class="hint">Tablet-scanned details, by month shipped. Working days (weekends excluded). Target ≤ <span class="tgt"></span> working days.</div>
+          <table id="cycle"></table>
+        </section>
+        <section>
+          <h2>Scan compliance</h2>
+          <div class="hint">% of shipped details scanned at each station. Not every part visits every station — watch the trend.</div>
+          <table id="compliance"></table>
+        </section>
+      </div>
+      <div>
+        <section>
+          <h2>Median time at each station</h2>
+          <div class="hint">Working days from check-in until the part moves on, by month checked in.</div>
+          <table id="dwell"></table>
+        </section>
+      </div>
+    </div>
+    <footer>
+      Directional, not billable: station times include overnight and cart waits; weekends are excluded. Cycle time counts only details scanned SHIPPED on a tablet —
+      office catch-up entries carry late dates and are left out. Stations that weren't scanned don't appear, so missed scans make a station look faster and the
+      unscanned time shows up only in the total. Targets (working days): <span id="tgts"></span>.
+    </footer>
+  </div>
+</div>
+<script src="shop-metrics.js"></script>
+<script>
+(async () => {
+  try {
+    const { months, dwell } = computeShopMetrics(await loadShopData('/api/quotes-proxy'));
+    const cols = shopLastMonths(6);
+    const pct = (n, d) => d ? Math.round(100 * n / d) + '%' : '—';
+    const label = k => `${shopYmLabel(k)} ${k.slice(0, 4)}`;
+    document.querySelectorAll('.tgt').forEach(e => e.textContent = SHOP_TOTAL_TARGET);
+    document.getElementById('tgts').textContent = SHOP_STATIONS.map(s => `${s} ≤${SHOP_TARGETS[s]}`).join(' · ') + ` · total ≤${SHOP_TOTAL_TARGET}`;
+    document.getElementById('asof').textContent = `Last 6 months · printed ${new Date().toLocaleDateString('default', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+
+    // Headline tiles: last full month vs the 6-month window
+    const shipped = cols.filter(c => months[c]);
+    const lastFull = [...shipped].reverse().find(c => c !== shopYm(new Date())) || shipped.at(-1);
+    const all = shipped.reduce((a, c) => { const m = months[c]; a.n += m.work.length; a.g += m.green; a.w.push(...m.work); a.due += m.due; a.ot += m.onTime; return a; }, { n: 0, g: 0, w: [], due: 0, ot: 0 });
+    const lm = months[lastFull];
+    const tile = (lbl, val, note, g) => `<div class="tile"><div class="lbl">${lbl}</div><div class="val ${g ? 'g-' + g : ''}" style="${g ? 'display:inline-block;padding:0 8px;border-radius:6px;' : ''}">${val}</div><div class="note">${note}</div></div>`;
+    document.getElementById('tiles').innerHTML =
+      tile(`${label(lastFull)}: details in the green`, pct(lm.green, lm.work.length), `${lm.green} of ${lm.work.length} shipped within ${SHOP_TOTAL_TARGET} working days`) +
+      tile(`${label(lastFull)}: median cycle`, `${shopMedian(lm.work)} days`, 'working days, dispatch to shipped', shopGrade(shopMedian(lm.work), SHOP_TOTAL_TARGET)) +
+      tile('6 months: details in the green', pct(all.g, all.n), `${all.g} of ${all.n} details`) +
+      tile('6 months: on time vs due date', pct(all.ot, all.due), `median cycle ${shopMedian(all.w)} working days`);
+
+    // Cycle time table
+    document.getElementById('cycle').innerHTML =
+      `<tr><th>Month shipped</th><th>Details</th><th>Median days</th><th>Green</th><th>Yellow</th><th>Red</th><th>On time</th></tr>` +
+      shipped.map(c => { const m = months[c], v = shopMedian(m.work), n = m.work.length;
+        return `<tr><td>${label(c)}</td><td>${n}</td><td class="g-${shopGrade(v, SHOP_TOTAL_TARGET)} ${n < 5 ? 'thin' : ''}">${v}</td><td>${pct(m.green, n)}</td><td>${pct(m.yellow, n)}</td><td>${pct(m.red, n)}</td><td>${pct(m.onTime, m.due)}</td></tr>`; }).join('');
+
+    // Station dwell grid + share of check-ins in the green across the window
+    document.getElementById('dwell').innerHTML =
+      `<tr><th>Station</th><th>Target</th>${cols.map(c => `<th>${shopYmLabel(c)}</th>`).join('')}<th>% green</th></tr>` +
+      SHOP_STATIONS.filter(s => dwell[s] && cols.some(c => dwell[s][c])).map(s => {
+        const tgt = SHOP_TARGETS[s], inWin = cols.flatMap(c => dwell[s][c] || []);
+        const green = inWin.filter(d => d <= tgt).length;
+        return `<tr><td>${s}</td><td class="muted">≤${tgt}</td>${cols.map(c => { const a = dwell[s][c] || [];
+          if (!a.length) return `<td class="muted">·</td>`;
+          const v = shopMedian(a);
+          return `<td class="g-${shopGrade(v, tgt)} ${a.length < 5 ? 'thin' : ''}" title="${a.length} parts">${v}</td>`; }).join('')}<td>${pct(green, inWin.length)} <span class="muted">(${inWin.length})</span></td></tr>`;
+      }).join('');
+
+    // Scan compliance
+    document.getElementById('compliance').innerHTML =
+      `<tr><th>Station</th>${shipped.map(c => `<th>${shopYmLabel(c)}</th>`).join('')}</tr>` +
+      SHOP_COMPLIANCE_STATIONS.map(s => `<tr><td>${s}</td>${shipped.map(c => `<td>${pct(months[c].scanned[s] || 0, months[c].work.length)}</td>`).join('')}</tr>`).join('');
+
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('report').style.display = '';
+  } catch (e) {
+    document.getElementById('status').textContent = 'Could not load shop data: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
