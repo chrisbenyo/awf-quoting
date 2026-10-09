@@ -70,10 +70,10 @@ export default async (req) => {
   // Shop cycle-time data for the dashboard: every shop job + every scan event, paged past the 1000-row cap.
   if (url.searchParams.get("shop")) {
     const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` };
-    const pageAll = async (path, hdrs = headers) => {
+    const pageAll = async (path) => {
       const rows = [];
       for (let offset = 0; ; offset += 1000) {
-        const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1000&offset=${offset}`, { headers: hdrs });
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}&limit=1000&offset=${offset}`, { headers });
         if (!r.ok) throw new Error(`${path}: ${r.status} ${await r.text()}`);
         const page = await r.json();
         rows.push(...page);
@@ -89,29 +89,12 @@ export default async (req) => {
       const wonAt = {};
       for (const q of wonQuotes) if (q.won_at) wonAt[q.id] = q.won_at;
 
-      // Won details still waiting to be dispatched. Detail list lives in line_items (behind RLS),
-      // so read it server-side and return only number/customer/won date per waiting detail.
-      let waiting = null;
-      if (SUPABASE_SERVICE_KEY) {
-        const live = wonQuotes.filter(q => q.won_at && !q.cancelled_at && !q.deleted_at && (q.po_number || '').trim());
-        const svc = { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}` };
-        const metas = [];
-        for (let i = 0; i < live.length; i += 120) {
-          const ids = live.slice(i, i + 120).map(q => q.id).join(',');
-          metas.push(...await pageAll(`line_items?select=quote_id,item_data&item_type=eq.detail_meta&quote_id=in.(${ids})&order=id`, svc));
-        }
-        const dispatched = new Set(jobs.map(j => `${j.quote_id}::${j.detail_number}`));
-        const byId = Object.fromEntries(live.map(q => [q.id, q]));
-        waiting = [];
-        for (const m of metas) {
-          const d = m.item_data || {};
-          if ((d.award_status || 'won') !== 'won') continue;
-          const detNum = String((parseInt(d.detail_idx, 10) || 0) + 1).padStart(2, '0');
-          if (dispatched.has(`${m.quote_id}::${detNum}`)) continue;
-          const q = byId[m.quote_id];
-          waiting.push({ number: q.number, customer: q.customer_name, won_at: q.won_at });
-        }
-      }
+      // Won orders (with a PO) waiting to be dispatched: nothing dispatched yet. Order level on purpose —
+      // it needs no line_items read, and partly-dispatched orders are a different problem.
+      const hasJobs = new Set(jobs.map(j => j.quote_id));
+      const waiting = wonQuotes
+        .filter(q => q.won_at && !q.cancelled_at && !q.deleted_at && (q.po_number || '').trim() && !hasJobs.has(q.id))
+        .map(q => ({ number: q.number, customer: q.customer_name, won_at: q.won_at }));
       return new Response(JSON.stringify({ jobs, events, wonAt, waiting }), {
         status: 200,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Cache-Control": "no-store" },

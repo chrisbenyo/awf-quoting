@@ -119,8 +119,8 @@
       tile(`${label(lastFull)}: median cycle`, `${shopMedian(lm.work)} days`, 'working days, dispatch to shipped', shopGrade(shopMedian(lm.work), SHOP_TOTAL_TARGET)) +
       tile('6 months: details in the green', pct(all.g, all.n), `${all.g} of ${all.n} details`) +
       tile('6 months: on time vs due date', pct(all.ot, all.due), `median cycle ${shopMedian(all.w)} working days`) +
-      (waiting ? tile('Waiting to dispatch now', `${waiting.n}`,
-        waiting.n ? `${waiting.orders} orders · ${waiting.red} over ${SHOP_DISPATCH_TARGET + 1} days · oldest ${waiting.oldest.days} days (Q${waiting.oldest.number})` : 'nothing waiting',
+      (waiting ? tile('Orders waiting to dispatch', `${waiting.n}`,
+        waiting.n ? `${waiting.red} over ${SHOP_DISPATCH_TARGET + 1} days · oldest ${waiting.oldest.days} days (Q${waiting.oldest.number})` : 'nothing waiting',
         waiting.n ? shopGrade(shopMedian(waiting.ages), SHOP_DISPATCH_TARGET) : 'green') : '');
 
     // Cycle time table

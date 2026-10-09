@@ -581,7 +581,7 @@ async function loadShopCycle() {
     if (waiting) {
       const o = waiting.oldest, g = waiting.n ? shopGrade(shopMedian(waiting.ages), SHOP_DISPATCH_TARGET) : 'green';
       document.getElementById('waitingLine').innerHTML = waiting.n
-        ? `<span style="background:${GRADE_BG[g]}.35);padding:2px 8px;border-radius:4px;font-weight:500;">${waiting.n} details waiting to dispatch</span> <span style="color:var(--text3)">· ${waiting.orders} orders · ${waiting.red} over 3 days · oldest ${o.days} days (Q${o.number}, ${o.customer || '—'})</span>`
+        ? `<span style="background:${GRADE_BG[g]}.35);padding:2px 8px;border-radius:4px;font-weight:500;">${waiting.n} orders waiting to dispatch</span> <span style="color:var(--text3)">· ${waiting.red} over 3 days · oldest ${o.days} days (Q${o.number}, ${o.customer || '—'})</span>`
         : `<span style="color:var(--green)">✓ Nothing waiting to dispatch</span>`;
     }
     const dkeys = shopLastMonths(6).filter(k => dispatch[k]);
