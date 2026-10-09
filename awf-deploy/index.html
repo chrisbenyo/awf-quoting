@@ -3736,6 +3736,27 @@ async function loadShopScreen() {
   await Promise.all([loadPendingDispatch(), loadActiveJobs()]);
 }
 
+// ── Where is a detail right now? ───────────────────────────────────────────
+// A detail can be checked in at two stations at once: SAW + BURN run in parallel off two
+// traveler copies, so they never close each other. A FIT check-in closes both, like any other move.
+// Same rules as the floor tablets (awf-shopfloor).
+const SHOP_CUTTING = ['SAW','BURN'];
+function shopClosesOnCheckin(openStation, newStation) {
+  if (openStation === newStation) return false;
+  if (SHOP_CUTTING.includes(openStation) && SHOP_CUTTING.includes(newStation)) return false;
+  return true;
+}
+// events (any order) → { jobId: [stations currently checked in] }. On a timestamp tie the checkout wins.
+function shopOpenStationsByJob(events) {
+  const sorted = [...events].sort((a,b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1
+    : (a.event_type === 'checkout') - (b.event_type === 'checkout'));
+  const last = {};
+  for (const ev of sorted) if (ev.shop_job_id) (last[ev.shop_job_id] ||= {})[ev.station] = ev.event_type;
+  const out = {};
+  for (const [jobId, st] of Object.entries(last)) out[jobId] = Object.keys(st).filter(s => st[s] === 'checkin');
+  return out;
+}
+
 async function loadFloorBoard() {
   const statRow = document.getElementById('floor-stat-row');
   const kanban  = document.getElementById('floor-kanban');
@@ -3757,17 +3778,23 @@ async function loadFloorBoard() {
     const qRows = await sbFetchByIds('quotes', 'id,customer_name', quoteIds);
     for (const q of qRows) custMap[q.id] = q.customer_name || '—';
     // Get latest stage per job from events
-    const {data:evts} = await sbDB.from('shop_events').select('shop_job_id,station,created_at').order('created_at',{ascending:false});
+    const {data:evts} = await sbDB.from('shop_events').select('shop_job_id,station,event_type,created_at').order('created_at',{ascending:false});
+    const boardCol = s => {
+      if (!s||s==='PURCHASED'||s==='DISPATCHED') return 'SAW';
+      if (s==='PRIME'||s==='CLEAN') return 'CLEAN_PRIME';
+      if (s==='BLAST'||s==='SANDBLAST') return 'SHIP';
+      return s;
+    };
     const stageMap = {};
     for (const ev of (evts||[])) {
-      if (ev.shop_job_id && !stageMap[ev.shop_job_id]) {
-        let s = ev.station || 'SAW';
-        if (!s||s==='PURCHASED'||s==='DISPATCHED') s='SAW';
-        else if (s==='PRIME'||s==='CLEAN') s='CLEAN_PRIME';
-        else if (s==='BLAST'||s==='SANDBLAST') s='SHIP';
-        stageMap[ev.shop_job_id] = s;
-      }
+      if (ev.shop_job_id && !stageMap[ev.shop_job_id]) stageMap[ev.shop_job_id] = boardCol(ev.station || 'SAW');
     }
+    // A detail at SAW + BURN at once shows in both columns
+    const openMap = shopOpenStationsByJob(evts||[]);
+    const colsFor = j => {
+      const open = [...new Set((openMap[j.id]||[]).map(boardCol))];
+      return open.length > 1 ? open : [j.stage];
+    };
     const STAGES = ['SAW','BURN','FIT','WELD','CLEAN_PRIME','SHIP'];
     const LABELS = {SAW:'Sawing',BURN:'Burn/Cut',FIT:'Fitting',WELD:'Welding',CLEAN_PRIME:'Cleaning/Priming',SHIP:'Ready to Ship'};
     const now = new Date();
@@ -3777,7 +3804,7 @@ async function loadFloorBoard() {
       stage: stageMap[j.id]||'SAW'
     }));
     const active  = enriched.filter(j => j.stage !== 'SHIP' && j.stage !== 'SHIPPED');
-    const cnt     = k => active.filter(j=>j.stage===k).length;
+    const cnt     = k => active.filter(j=>colsFor(j).includes(k)).length;
     const overdue = active.filter(j=>j.due_date&&(new Date(j.due_date)-now)<0).length;
     const soon    = active.filter(j=>{const d=new Date(j.due_date)-now;return j.due_date&&d>=0&&d<3*86400000;}).length;
     if (statRow) statRow.innerHTML = `
@@ -3792,7 +3819,10 @@ async function loadFloorBoard() {
     const byStage = {};
     STAGES.forEach(s => byStage[s] = []);
     // SHIPPED jobs are removed from board entirely — they've left the building
-    enriched.filter(j => j.stage !== 'SHIPPED').forEach(j => { const s = STAGES.includes(j.stage)?j.stage:'SAW'; byStage[s].push(j); });
+    enriched.filter(j => j.stage !== 'SHIPPED').forEach(j => {
+      const cols = colsFor(j);
+      cols.forEach(c => { const s = STAGES.includes(c)?c:'SAW'; byStage[s].push({...j, alsoAt: cols.filter(o => o !== c)}); });
+    });
     function dueCls(d) {
       if (!d) return '';
       const diff = (new Date(d)-now)/86400000;
@@ -3806,7 +3836,7 @@ async function loadFloorBoard() {
       const here = byStage[stage];
       const cards = here.length
         ? here.map(j => `<div class="kol-card" onclick="switchShopTab('active',document.getElementById('stab-active'))">
-            <div class="kol-card-po">${esc(j.po_number||'—')}</div>
+            <div class="kol-card-po">${esc(j.po_number||'—')}${(j.alsoAt||[]).map(o => ` <span style="font-size:10px;color:var(--amber);" title="Also checked in at ${esc(LABELS[o]||o)}">+${esc(o)}</span>`).join('')}</div>
             <div class="kol-card-name">${esc(j.detail_name||('Det '+j.detail_number))}</div>
             <div class="kol-card-meta">${esc(j.customer)} · qty ${j.quantity||1}</div>
             <span class="kol-card-due ${dueCls(j.due_date)}">Due ${fmtDue(j.due_date)}</span>
@@ -4368,16 +4398,20 @@ async function loadActiveJobs() {
     }
   }
 
+  const openMap = shopOpenStationsByJob(events || []);   // SAW + BURN can both be open
+
   // Enrich jobs with customer, won_at, and stage — exclude SHIPPED (off the floor)
   const enriched = jobs.map(job => {
     const s = stageMap[job.id];
     const info = quoteInfoMap[job.quote_id] || {};
+    const stage = s ? s.station : 'DISPATCHED';
     return {
       ...job,
       customer: info.customer || '—',
       won_at: info.won_at || null,
-      stage: s ? s.station : 'DISPATCHED',
-      stageActive: s ? s.active : false
+      stage,
+      stageActive: s ? s.active : false,
+      alsoAt: (openMap[job.id] || []).filter(o => o !== stage)
     };
   }).filter(job => job.stage !== 'SHIPPED');
 
@@ -4454,7 +4488,7 @@ async function loadActiveJobs() {
               style="font-size:11px;padding:2px 4px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;color:var(--text);"
               onchange="stageDropdownChanged('${job.id}',this)">
               ${stageOpts}
-            </select>
+            </select>${job.alsoAt.map(o => ` <span style="font-size:10px;color:var(--amber);font-family:var(--font);" title="Also checked in at ${esc(o)}">+${esc(o)}</span>`).join('')}
           </td>
           <td><button class="btn btn-ghost btn-sm" style="font-size:11px;white-space:nowrap;"
             onclick="editJobInline('${job.id}','${esc(job.detail_number)}','${esc(job.detail_name||'')}','${esc(job.log_number||'')}',this.closest('tr'))">Edit</button></td>
@@ -4608,17 +4642,12 @@ async function saveAllStageChanges() {
 
   // Auto-checkout (same rule as the floor tablets): moving a job closes any check-in
   // still open at another station. SAW and BURN run in parallel and don't close each other.
-  const runsInParallel = (a, b) => ['SAW','BURN'].includes(a) && ['SAW','BURN'].includes(b);
   const priorEvents = await sbFetchByIds('shop_events', 'shop_job_id,station,event_type,created_at',
     [..._pendingStageChanges.keys()], 'shop_job_id');
-  priorEvents.sort((a,b) => a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1
-    : (a.event_type === 'checkout') - (b.event_type === 'checkout'));
-  const lastByJob = {};
-  for (const ev of priorEvents) (lastByJob[ev.shop_job_id] ||= {})[ev.station] = ev.event_type;
+  const openByJob = shopOpenStationsByJob(priorEvents);
 
   _pendingStageChanges.forEach((change, jobId) => {
-    const last = lastByJob[jobId] || {};
-    Object.keys(last).filter(s => last[s] === 'checkin' && s !== change.newStage && !runsInParallel(s, change.newStage))
+    (openByJob[jobId] || []).filter(s => shopClosesOnCheckin(s, change.newStage))
       .forEach(s => events.push({
         shop_job_id: jobId, po_number: change.po || null, detail_number: change.det || null,
         station: s, tablet_station: change.newStage, operator_initials: initials,
