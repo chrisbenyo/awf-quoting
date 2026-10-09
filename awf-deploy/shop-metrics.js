@@ -7,6 +7,7 @@
 // Targets in working days. Green = at/under target, yellow = 1 day over, red = 2+ days over.
 const SHOP_TARGETS = { SAW: 4, BURN: 4, FIT: 2, WELD: 2, CLEAN: 3, PRIME: 3, SANDBLAST: 3, SHIP: 3 };
 const SHOP_TOTAL_TARGET = 11;   // dispatch → shipped
+const SHOP_DISPATCH_TARGET = 2; // won → dispatched (office)
 const SHOP_STATIONS = Object.keys(SHOP_TARGETS);
 const SHOP_COMPLIANCE_STATIONS = ['SAW', 'BURN', 'FIT', 'WELD'];
 
@@ -30,8 +31,32 @@ async function loadShopData(proxy) {
   return data;
 }
 
-// → { months: {ym: {work, cal, due, onTime, green, yellow, red, scanned:{SAW:n,…}}}, dwell: {station: {ym: [workdays]}} }
-function computeShopMetrics({ jobs, events }) {
+// → { months: {ym: {work, cal, due, onTime, green, yellow, red, scanned:{SAW:n,…}}}, dwell: {station: {ym: [workdays]}},
+//     dispatch: {ym: {wd:[], green, yellow, red}}   (won → dispatched, by month dispatched),
+//     waiting: {n, orders, ages:[], green, yellow, red, oldest:{number,customer,days}} | null }
+function computeShopMetrics({ jobs, events, wonAt = {}, waiting: waitingRaw = null }) {
+  // Won → dispatched (office), per detail, bucketed by month dispatched
+  const dispatch = {};
+  for (const j of jobs) {
+    if (j.cancelled_at || !j.dispatched_at || !wonAt[j.quote_id]) continue;
+    const t = new Date(j.dispatched_at), wd = shopWorkDays(new Date(wonAt[j.quote_id]), t);
+    const m = (dispatch[shopYm(t)] ||= { wd: [], green: 0, yellow: 0, red: 0 });
+    m.wd.push(wd);
+    m[shopGrade(wd, SHOP_DISPATCH_TARGET)]++;
+  }
+  // Won details waiting to be dispatched right now
+  let waiting = null;
+  if (waitingRaw) {
+    const now = new Date();
+    waiting = { n: waitingRaw.length, orders: new Set(waitingRaw.map(w => w.number)).size, ages: [], green: 0, yellow: 0, red: 0, oldest: null };
+    for (const w of waitingRaw) {
+      const days = shopWorkDays(new Date(w.won_at), now);
+      waiting.ages.push(days);
+      waiting[shopGrade(days, SHOP_DISPATCH_TARGET)]++;
+      if (!waiting.oldest || days > waiting.oldest.days) waiting.oldest = { number: w.number, customer: w.customer, days };
+    }
+  }
+
   const byJob = {};
   for (const e of events) (byJob[e.shop_job_id] ||= []).push(e);
 
@@ -71,5 +96,5 @@ function computeShopMetrics({ jobs, events }) {
       ((dwell[e.station] ||= {})[shopYm(t)] ||= []).push(shopWorkDays(t, new Date(out.created_at)));
     });
   }
-  return { months, dwell };
+  return { months, dwell, dispatch, waiting };
 }

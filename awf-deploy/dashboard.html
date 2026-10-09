@@ -183,6 +183,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--s
     <div style="font-size:11px;color:var(--text3);margin:-6px 0 10px;">Median working days by month shipped · tablet-scanned details only · target ≤11 · lower is better</div>
     <div style="position:relative;height:200px;"><canvas id="cycleChart" role="img" aria-label="Median working days from dispatch to shipped, by month"></canvas></div>
     <table class="win-table" id="cycleTable" style="margin-top:12px;"></table>
+    <div class="card-title" style="margin:18px 0 6px;">Won → dispatched (office) · target ≤2 working days</div>
+    <div id="waitingLine" style="font-size:12px;margin-bottom:8px;"></div>
+    <table class="win-table" id="dispatchTable"></table>
   </div>
   <div class="card">
     <div class="card-title">Median dwell by station (working days)</div>
@@ -572,7 +575,20 @@ const GRADE_BG = { green: 'rgba(74,222,128,', yellow: 'rgba(250,204,21,', red: '
 
 async function loadShopCycle() {
   try {
-    const { months, dwell } = computeShopMetrics(await loadShopData(PROXY));
+    const { months, dwell, dispatch, waiting } = computeShopMetrics(await loadShopData(PROXY));
+
+    // 0. Won → dispatched (office): waiting now + monthly medians
+    if (waiting) {
+      const o = waiting.oldest, g = waiting.n ? shopGrade(shopMedian(waiting.ages), SHOP_DISPATCH_TARGET) : 'green';
+      document.getElementById('waitingLine').innerHTML = waiting.n
+        ? `<span style="background:${GRADE_BG[g]}.35);padding:2px 8px;border-radius:4px;font-weight:500;">${waiting.n} details waiting to dispatch</span> <span style="color:var(--text3)">· ${waiting.orders} orders · ${waiting.red} over 3 days · oldest ${o.days} days (Q${o.number}, ${o.customer || '—'})</span>`
+        : `<span style="color:var(--green)">✓ Nothing waiting to dispatch</span>`;
+    }
+    const dkeys = shopLastMonths(6).filter(k => dispatch[k]);
+    document.getElementById('dispatchTable').innerHTML =
+      `<tr><th>Month dispatched</th><th style="text-align:right">Details</th><th style="text-align:right">Work days</th><th style="text-align:right">≤${SHOP_DISPATCH_TARGET} days</th></tr>` +
+      dkeys.map(k => { const m = dispatch[k], v = shopMedian(m.wd), g = shopGrade(v, SHOP_DISPATCH_TARGET);
+        return `<tr><td>${shopYmLabel(k)} ${k.slice(2, 4)}</td><td style="text-align:right">${m.wd.length}</td><td style="text-align:right;background:${GRADE_BG[g]}.35)">${v}</td><td style="text-align:right">${Math.round(100 * m.green / m.wd.length)}%</td></tr>`; }).join('');
 
     // 1. Cycle time by month shipped
     const keys = Object.keys(months).sort();

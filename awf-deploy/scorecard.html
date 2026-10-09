@@ -14,7 +14,7 @@
   h1 { font-size: 20px; }
   .sub { color: #6b7280; font-size: 11px; margin-top: 2px; }
   .actions button { font: inherit; padding: 6px 14px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; cursor: pointer; }
-  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
   .tile { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px 12px; }
   .tile .lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
   .tile .val { font-size: 24px; font-weight: 600; margin-top: 2px; }
@@ -74,6 +74,11 @@
           <div class="hint">Working days from check-in until the part moves on, by month checked in.</div>
           <table id="dwell"></table>
         </section>
+        <section>
+          <h2>Won to dispatched (office)</h2>
+          <div class="hint">Working days from quote won to detail dispatched, by month dispatched. Target ≤ <span class="dtgt"></span> working days. Clearing an old backlog raises a month's number.</div>
+          <table id="dispatch"></table>
+        </section>
       </div>
     </div>
     <footer>
@@ -87,12 +92,20 @@
 <script>
 (async () => {
   try {
-    const { months, dwell } = computeShopMetrics(await loadShopData('/api/quotes-proxy'));
+    const { months, dwell, dispatch, waiting } = computeShopMetrics(await loadShopData('/api/quotes-proxy'));
     const cols = shopLastMonths(6);
     const pct = (n, d) => d ? Math.round(100 * n / d) + '%' : '—';
     const label = k => `${shopYmLabel(k)} ${k.slice(0, 4)}`;
     document.querySelectorAll('.tgt').forEach(e => e.textContent = SHOP_TOTAL_TARGET);
-    document.getElementById('tgts').textContent = SHOP_STATIONS.map(s => `${s} ≤${SHOP_TARGETS[s]}`).join(' · ') + ` · total ≤${SHOP_TOTAL_TARGET}`;
+    document.querySelectorAll('.dtgt').forEach(e => e.textContent = SHOP_DISPATCH_TARGET);
+    document.getElementById('tgts').textContent = `won→dispatched ≤${SHOP_DISPATCH_TARGET} · ` + SHOP_STATIONS.map(s => `${s} ≤${SHOP_TARGETS[s]}`).join(' · ') + ` · dispatched→shipped ≤${SHOP_TOTAL_TARGET}`;
+
+    // Won → dispatched table
+    const dkeys = cols.filter(k => dispatch[k]);
+    document.getElementById('dispatch').innerHTML =
+      `<tr><th>Month dispatched</th><th>Details</th><th>Median days</th><th>Green</th><th>Yellow</th><th>Red</th></tr>` +
+      dkeys.map(k => { const m = dispatch[k], v = shopMedian(m.wd), n = m.wd.length;
+        return `<tr><td>${label(k)}</td><td>${n}</td><td class="g-${shopGrade(v, SHOP_DISPATCH_TARGET)} ${n < 5 ? 'thin' : ''}">${v}</td><td>${pct(m.green, n)}</td><td>${pct(m.yellow, n)}</td><td>${pct(m.red, n)}</td></tr>`; }).join('');
     document.getElementById('asof').textContent = `Last 6 months · printed ${new Date().toLocaleDateString('default', { month: 'long', day: 'numeric', year: 'numeric' })}`;
 
     // Headline tiles: last full month vs the 6-month window
@@ -105,7 +118,10 @@
       tile(`${label(lastFull)}: details in the green`, pct(lm.green, lm.work.length), `${lm.green} of ${lm.work.length} shipped within ${SHOP_TOTAL_TARGET} working days`) +
       tile(`${label(lastFull)}: median cycle`, `${shopMedian(lm.work)} days`, 'working days, dispatch to shipped', shopGrade(shopMedian(lm.work), SHOP_TOTAL_TARGET)) +
       tile('6 months: details in the green', pct(all.g, all.n), `${all.g} of ${all.n} details`) +
-      tile('6 months: on time vs due date', pct(all.ot, all.due), `median cycle ${shopMedian(all.w)} working days`);
+      tile('6 months: on time vs due date', pct(all.ot, all.due), `median cycle ${shopMedian(all.w)} working days`) +
+      (waiting ? tile('Waiting to dispatch now', `${waiting.n}`,
+        waiting.n ? `${waiting.orders} orders · ${waiting.red} over ${SHOP_DISPATCH_TARGET + 1} days · oldest ${waiting.oldest.days} days (Q${waiting.oldest.number})` : 'nothing waiting',
+        waiting.n ? shopGrade(shopMedian(waiting.ages), SHOP_DISPATCH_TARGET) : 'green') : '');
 
     // Cycle time table
     document.getElementById('cycle').innerHTML =
