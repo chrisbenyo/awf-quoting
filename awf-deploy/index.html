@@ -2426,7 +2426,11 @@ async function __fetchDeployTag(){
   try{
     const url=location.pathname.replace(/[^/]*$/,'')+'index.html?_v='+Date.now();
     const r=await fetch(url,{method:'HEAD',cache:'no-store'});
-    return r.headers.get('etag')||r.headers.get('last-modified')||null;
+    // Netlify suffixes the content hash by encoding ("<hash>-ssl" vs "<hash>-ssl-df" when compressed),
+    // so the same deploy can show two ETags. Compare only the hash.
+    const etag=r.headers.get('etag');
+    if(etag) return etag.replace(/^W\//,'').replace(/"/g,'').split('-')[0];
+    return r.headers.get('last-modified')||null;
   }catch(e){ return null; }
 }
 async function __checkDeploy(){
