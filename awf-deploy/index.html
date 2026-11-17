@@ -321,6 +321,7 @@ table.bom select option{background:var(--surface2);}
 
 /* Active jobs table */
 .jobs-table{width:100%;border-collapse:collapse;font-size:13px;}
+.od-only{display:none;} .overdue-mode .od-only{display:block;}
 .jobs-table th{background:var(--surface);padding:8px 12px;text-align:left;font-family:var(--font);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);}
 .jobs-table td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
 .jobs-table tr:hover td{background:var(--surface2);}
@@ -500,6 +501,7 @@ table.bom select option{background:var(--surface2);}
     <div id="shop-active-panel" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;flex-wrap:wrap;">
         <input id="active-search" class="sidebar-search" placeholder="🔍  Search PO, customer, detail, log #…" oninput="filterActiveList()" style="max-width:380px;margin-bottom:0;">
+        <button id="overdue-toggle" class="btn btn-ghost btn-sm" onclick="toggleOverdueOnly()" title="Details more than 3 weeks past due with no SHIPPED scan — usually shipped but never scanned">⏰ Overdue 3+ wks</button>
         <button class="btn btn-ghost btn-sm" onclick="openStatusReportFromActive()" title="Open customer-facing status report for the customer currently filtered above" style="border-color:var(--teal);color:var(--teal);">📋 Customer Status Report</button>
       </div>
       <div id="shop-active-list"><div style="color:var(--text3);font-size:13px;padding:20px 0;">Loading…</div></div>
@@ -1393,6 +1395,13 @@ function showApp(){
   if(currentProfile?.role==='admin') document.getElementById('pricing-nav-btn').style.display='inline-flex';
   loadPricingConfig();
   loadQuotes().then(_applyCustomerFilterFromUrl);
+  // ?view=overdue (link in the weekly overdue email) → Shop screen, Active Jobs, overdue filter on
+  if(currentProfile?.role==='admin' && new URLSearchParams(window.location.search).get('view')==='overdue'){
+    window.history.replaceState(null,'',window.location.pathname);
+    _overdueOnly = true;
+    openShopScreen();
+    switchShopTab('active', document.getElementById('stab-active'));
+  }
   // Keepalive removed — sessionStorage handles per-tab sessions cleanly
 }
 
@@ -4079,8 +4088,25 @@ function filterActiveList() {
     const job = _activeRows[i];
     if (!job) return;
     const hay = [job.po_number, job.customer, job.detail_number, job.detail_name, job.log_number, job.stage].join(' ').toLowerCase();
-    row.style.display = (!term || hay.includes(term)) ? '' : 'none';
+    row.style.display = (!term || hay.includes(term)) && (!_overdueOnly || job.overdue3wk) ? '' : 'none';
   });
+}
+
+// ── OVERDUE 3+ WEEKS: details long past due with no SHIPPED scan (usually shipped, scan missed) ──
+let _overdueOnly = false;
+function toggleOverdueOnly(on = !_overdueOnly) {
+  _overdueOnly = on;
+  const btn = document.getElementById('overdue-toggle');
+  if (btn) { btn.style.borderColor = on ? 'var(--red)' : ''; btn.style.color = on ? 'var(--red)' : ''; }
+  document.getElementById('shop-active-list')?.classList.toggle('overdue-mode', on);
+  filterActiveList();
+}
+// Stage one detail as SHIPPED (still goes through Save All, like any stage change)
+function quickShip(jobId) {
+  const sel = document.querySelector(`#jobrow-${jobId} .stage-select`);
+  if (!sel) return;
+  sel.value = 'SHIPPED';
+  stageDropdownChanged(jobId, sel);
 }
 
 // Opens the customer-facing status report in a new tab, using whichever customer the
@@ -4394,13 +4420,22 @@ async function loadActiveJobs() {
 
   const stageMap = {};
   for (const ev of (events||[])) {
-    if (!stageMap[ev.shop_job_id]) {
+    const cur = stageMap[ev.shop_job_id];
+    // Office batch updates write the auto-checkout and the next check-in at the same instant —
+    // on a tie the check-in wins (it's where the part went).
+    if (!cur || (ev.created_at === cur.at && ev.event_type === 'checkin' && !cur.active)) {
       stageMap[ev.shop_job_id] = {
         station: ev.station,
-        active: ev.event_type === 'checkin'
+        active: ev.event_type === 'checkin',
+        at: ev.created_at
       };
     }
   }
+  // Once checked in at SHIPPED, a detail is shipped whatever was scanned around it
+  for (const ev of (events||[])) {
+    if (ev.station === 'SHIPPED' && ev.event_type === 'checkin') stageMap[ev.shop_job_id] = { station: 'SHIPPED', active: true, at: ev.created_at };
+  }
+  const overdueCutoff = new Date(); overdueCutoff.setHours(0,0,0,0); overdueCutoff.setDate(overdueCutoff.getDate() - 21);
 
   const openMap = shopOpenStationsByJob(events || []);   // SAW + BURN can both be open
 
@@ -4415,9 +4450,14 @@ async function loadActiveJobs() {
       won_at: info.won_at || null,
       stage,
       stageActive: s ? s.active : false,
+      lastScan: s ? s.at : null,
+      overdue3wk: !!job.due_date && new Date(job.due_date.substring(0, 10) + 'T12:00:00') < overdueCutoff,
       alsoAt: (openMap[job.id] || []).filter(o => o !== stage)
     };
   }).filter(job => job.stage !== 'SHIPPED');
+  const overdueCount = enriched.filter(j => j.overdue3wk).length;
+  const odBtn = document.getElementById('overdue-toggle');
+  if (odBtn) odBtn.textContent = `⏰ Overdue 3+ wks (${overdueCount})`;
 
   // Sort
   const {col, dir} = activeJobsSort;
@@ -4493,6 +4533,8 @@ async function loadActiveJobs() {
               onchange="stageDropdownChanged('${job.id}',this)">
               ${stageOpts}
             </select>${job.alsoAt.map(o => ` <span style="font-size:10px;color:var(--amber);font-family:var(--font);" title="Also checked in at ${esc(o)}">+${esc(o)}</span>`).join('')}
+            ${job.overdue3wk ? `<div class="od-only" style="font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap;">Last scan ${job.lastScan ? (() => { const d=new Date(job.lastScan); return `${d.getMonth()+1}/${d.getDate()}`; })() : 'never'}
+              <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:1px 8px;margin-left:6px;border-color:var(--teal);color:var(--teal);" onclick="quickShip('${job.id}')" title="Stage as SHIPPED, then Save All">✓ Shipped</button></div>` : ''}
           </td>
           <td><button class="btn btn-ghost btn-sm" style="font-size:11px;white-space:nowrap;"
             onclick="editJobInline('${job.id}','${esc(job.detail_number)}','${esc(job.detail_name||'')}','${esc(job.log_number||'')}',this.closest('tr'))">Edit</button></td>
@@ -4502,6 +4544,7 @@ async function loadActiveJobs() {
   </table>`;
   // After render, re-apply any pending stage changes so sorting doesn't lose work-in-progress
   applyPendingToUI();
+  toggleOverdueOnly(_overdueOnly);   // re-apply search box + overdue filter across re-renders
 }
 
 // ── Staged stage edits: dropdowns accumulate changes locally, Save All commits batch ──
