@@ -278,6 +278,25 @@ async function sbFetch(path, options={}){
   const text = await res.text();
   return text ? JSON.parse(text) : [];
 }
+// Supabase returns at most 1000 rows per request and silently drops the rest — page until a short page.
+// `path` must include a stable order (ending in id).
+async function sbFetchAll(path){
+  const rows = [];
+  for(let offset = 0; ; offset += 1000){
+    const page = await sbFetch(`${path}&limit=1000&offset=${offset}`);
+    rows.push(...page);
+    if(page.length < 1000) return rows;
+  }
+}
+// Fetch rows whose `col` is in `ids`, in chunks so the URL stays short; each chunk is paged.
+async function sbFetchIn(base, col, ids){
+  const out = [];
+  for(let i = 0; i < ids.length; i += 120){
+    const csv = ids.slice(i, i + 120).map(id => `"${id}"`).join(',');
+    out.push(...await sbFetchAll(`${base}&${col}=in.(${csv})`));
+  }
+  return out;
+}
 
 // ============================================================
 // Customer-name normalization — must match customers.html and index.html
@@ -302,8 +321,9 @@ function fmtDateShort(d){
 }
 function timeAgo(d){
   if(!d) return '—';
-  const ms = Date.now() - new Date(d).getTime();
-  const days = Math.floor(ms / (1000*60*60*24));
+  // Calendar days, so yesterday evening reads "yesterday", not "today"
+  const dt = new Date(d), now = new Date();
+  const days = Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(dt.getFullYear(), dt.getMonth(), dt.getDate())) / (1000*60*60*24));
   if(days < 0) return 'in the future';
   if(days === 0) return 'today';
   if(days === 1) return 'yesterday';
@@ -322,8 +342,16 @@ function escapeHtml(s){
 // Returns {kind, label, station, lastEventAt, badgeClass}
 // kind ∈ 'dispatched' | 'progress' | 'completed' | 'shipped'
 function computeStatus(job, events){
+  // Newest first. Office batch updates write the old station's auto-checkout and the new check-in with the
+  // SAME timestamp, so on a tie the check-in wins (it's where the part went).
   const jobEvents = events.filter(e => e.shop_job_id === job.id)
-                          .sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                          .sort((a,b) => (new Date(b.created_at) - new Date(a.created_at))
+                                       || ((b.event_type === 'checkin') - (a.event_type === 'checkin')));
+  // Once a detail has been checked in at SHIPPED it's shipped, whatever was scanned around it.
+  const ship = jobEvents.find(e => e.event_type === 'checkin' && (e.station||'').toUpperCase() === 'SHIPPED');
+  if(ship){
+    return {kind:'shipped', label:'Shipped ✓', station:'SHIPPED', lastEventAt:ship.created_at, badgeClass:'shipped'};
+  }
   if(jobEvents.length === 0){
     return {
       kind:'dispatched', label:'Dispatched', station:null,
@@ -431,7 +459,8 @@ function renderReport(customerName, jobs, events){
   const STATUS_RANK = {dispatched:0, progress:1, completed:2, shipped:3};
   const poEntries = [...byPO.entries()].map(([po, group]) => {
     const fullyShipped = group.every(a => a.status.kind === 'shipped');
-    const dues = group.map(a => a.job.due_date).filter(Boolean).map(d => new Date(d));
+    // A bare "YYYY-MM-DD" parses as UTC midnight (= the day before in Michigan); read it as a local date.
+    const dues = group.map(a => a.job.due_date).filter(Boolean).map(d => new Date(String(d).slice(0, 10) + 'T00:00:00'));
     const minDue = dues.length ? dues.reduce((a,b) => a < b ? a : b) : null;
     const openRanks = group.filter(a => a.status.kind !== 'shipped').map(a => STATUS_RANK[a.status.kind] ?? 0);
     const statusRank = openRanks.length ? Math.min(...openRanks) : 99;
@@ -526,7 +555,7 @@ async function boot(){
 
   let candidateQuotes = [];
   try {
-    candidateQuotes = await sbFetch(`/rest/v1/quotes?select=id,customer_name&customer_name=ilike.%25${encodeURIComponent(firstWord)}%25`);
+    candidateQuotes = await sbFetchAll(`/rest/v1/quotes?select=id,customer_name&customer_name=ilike.%25${encodeURIComponent(firstWord)}%25&order=id`);
   } catch(e) {
     fail('Could not load quotes: ' + e.message);
     return;
@@ -543,14 +572,13 @@ async function boot(){
     return;
   }
 
-  // Fetch all shop_jobs for those quotes (using in.() with comma-separated IDs).
-  // Supabase PostgREST supports up to ~1000 IDs per request; we expect far fewer.
-  const idsCsv = matchingQuoteIds.map(id => `"${id}"`).join(',');
+  // Fetch all shop_jobs for those quotes (chunked + paged; cancelled details don't belong on the report).
   let jobs = [];
   try {
-    jobs = await sbFetch(
-      `/rest/v1/shop_jobs?select=id,quote_id,po_number,detail_number,detail_name,quantity,due_date,dispatched_at&quote_id=in.(${idsCsv})&order=po_number.asc,detail_number.asc`
-    );
+    jobs = (await sbFetchIn(
+      `/rest/v1/shop_jobs?select=id,quote_id,po_number,detail_number,detail_name,quantity,due_date,dispatched_at,cancelled_at&order=id`,
+      'quote_id', matchingQuoteIds
+    )).filter(j => !j.cancelled_at);
   } catch(e) {
     fail('Could not load shop jobs: ' + e.message);
     return;
@@ -565,11 +593,12 @@ async function boot(){
   }
 
   // Fetch all events for those jobs
-  const jobIdsCsv = jobs.map(j => `"${j.id}"`).join(',');
+  // (Paslin alone passed 1000 events in Nov 2026 — unpaged, the oldest jobs lost their scans and read "Dispatched".)
   let events = [];
   try {
-    events = await sbFetch(
-      `/rest/v1/shop_events?select=id,shop_job_id,station,event_type,created_at&shop_job_id=in.(${jobIdsCsv})&order=created_at.desc`
+    events = await sbFetchIn(
+      `/rest/v1/shop_events?select=id,shop_job_id,station,event_type,created_at&order=created_at.desc,id`,
+      'shop_job_id', jobs.map(j => j.id)
     );
   } catch(e) {
     fail('Could not load shop events: ' + e.message);
