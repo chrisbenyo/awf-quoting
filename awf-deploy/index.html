@@ -2514,9 +2514,23 @@ async function saveHeader(){
   const el=document.getElementById('save-status');if(el) el.textContent='Saved ✓';
   setTimeout(()=>{const el=document.getElementById('save-status');if(el&&el.textContent==='Saved ✓') el.textContent='';},2000);
 }
-async function saveItems(){
+// saveItems is delete-all + re-insert, so two overlapping runs both delete and
+// then both insert = every item doubled. Serialize: at most one save runs, plus
+// one queued behind it (which saves the latest state when its turn comes).
+let __itemsSaveRunning=null, __itemsSaveNext=null;
+function saveItems(){
+  if(__itemsSaveNext) return __itemsSaveNext;
+  if(__itemsSaveRunning){
+    __itemsSaveNext=__itemsSaveRunning.catch(()=>{}).then(()=>{__itemsSaveNext=null;return saveItems();});
+    return __itemsSaveNext;
+  }
+  __itemsSaveRunning=_saveItemsNow().finally(()=>{__itemsSaveRunning=null;});
+  return __itemsSaveRunning;
+}
+async function _saveItemsNow(){
   if(!currentQuoteId) return;
   if(__appStale){ __showStaleBanner(); return; }
+  const qid=currentQuoteId;
   const el=document.getElementById('save-status');if(el) el.textContent='Saving items…';
   // Check session before proceeding
   const{data:{session}}=await sbAuth.getSession();
@@ -2524,6 +2538,7 @@ async function saveItems(){
     if(el) el.textContent='Session expired — please sign in again';
     toast('Session expired — please refresh the page','err');
   }
+  if(currentQuoteId!==qid) return; // quote switched while waiting — never write one quote's items onto another
   // Build all rows first, THEN delete+insert atomically
   const rows=[];let sort=0;
   details.forEach((d,di)=>{
