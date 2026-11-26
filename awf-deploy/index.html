@@ -2134,7 +2134,14 @@ function buildTotalsHTML(d,T){
     ${overrideRow}
     <div class="total-item"><div class="total-item-label">× ${T.qty} Detail(s)</div><div class="total-item-value big">${fmt(T.total)}</div></div>
     <div class="total-item"><div class="total-item-label">~Weight</div><div class="total-item-value wt">${fmtWt(T.totalWeight*T.qty)} lbs</div></div>
-  </div>`;
+  </div>${buildStockHTML(d)}`;
+}
+function buildStockHTML(d){
+  const S=stockNeeded(d);
+  if(!S.length) return '';
+  const rows=S.map(g=>`<div style="display:flex;gap:14px;padding:2px 0;"><span style="flex:1;color:var(--text);">${esc(g.label)}</span><span style="font-weight:600;color:var(--text);min-width:70px;text-align:right;">${g.ft.toFixed(1)} ft</span><span style="color:var(--text2);min-width:56px;text-align:right;">${g.pcs} pcs</span><span style="color:var(--text3);min-width:130px;text-align:right;">${stockSticks(g)}</span></div>`).join('');
+  return `<div style="border-top:1px dashed var(--border);margin-top:8px;padding-top:8px;font-family:var(--font);font-size:12px;">
+    <div style="font-size:11px;color:var(--amber);font-weight:600;margin-bottom:4px;">STOCK NEEDED (× ${parseInt(d.quantity)||1}) <span style="color:var(--text3);font-weight:400;">· office only, not on the customer quote</span></div>${rows}</div>`;
 }
 
 // ============================================================
@@ -2701,6 +2708,36 @@ function dimToFracIn(val, unit) {
   return decimalToFraction(inches) + '"';
 }
 
+// Linear stock needed for one detail: total feet per tube/angle/channel size, x detail qty.
+// A horseshoes number for buying steel (no kerf, no cut plan). Office screen + traveler only.
+function stockNeeded(d) {
+  const dq = parseInt(d.quantity)||1, groups = {};
+  for (const it of (d.items||[])) {
+    let lenIn = null, label = '';
+    if (it.type === 'tube') {
+      lenIn = resolveLength(it.tubeLength, it.tubeLengthUnit||'mm');
+      const tt = it.tubeType||'square';
+      if (tt === 'round') label = `RND TUBE ${dimToFracIn(it.dim1,'in')} OD x ${dimToFracIn(it.wall,'in')} W/T`;
+      else if (tt === 'square' || it.dim1 === it.dim2 || !it.dim2) label = `SQ TUBE ${dimToFracIn(it.dim1,'in')} x ${dimToFracIn(it.wall,'in')} W/T`;
+      else label = `RECT TUBE ${dimToFracIn(it.dim1,'in')} x ${dimToFracIn(it.dim2,'in')} x ${dimToFracIn(it.wall,'in')} W/T`;
+    } else if (it.type === 'angle') {
+      lenIn = resolveLength(it.angleLength, it.angleLengthUnit||'mm');
+      label = `ANGLE ${dimToFracIn(it.angleLeg1,'in')} x ${dimToFracIn(it.angleLeg2||it.angleLeg1,'in')} x ${dimToFracIn(it.angleThick,'in')}`;
+    } else if (it.type === 'cchannel') {
+      lenIn = resolveLength(it.cLength, it.cLengthUnit||'mm');
+      label = (it.cUseLbFt && it.cLbFt) ? `C CHANNEL ${dimToFracIn(it.cDepth,'in')} @ ${it.cLbFt} lb/ft` : `C CHANNEL ${dimToFracIn(it.cDepth,'in')}`;
+    } else continue;
+    if (!lenIn || lenIn <= 0) continue;
+    const pcs = (parseInt(it.qty)||1) * dq;
+    const g = groups[label] || (groups[label] = {label, pcs:0, ft:0, longestFt:0});
+    g.pcs += pcs; g.ft += lenIn*pcs/12; g.longestFt = Math.max(g.longestFt, lenIn/12);
+  }
+  return Object.values(groups);
+}
+function stockSticks(g) {
+  return g.longestFt > 24 ? "piece over 24'" : '≈' + Math.ceil(g.ft/24) + " × 24' sticks";
+}
+
 function formatItemForReport(item) {
   if (item.parseError) return item.parseError;
   if (item.type === 'tube') {
@@ -2879,6 +2916,8 @@ async function generateOrderReport() {
             <div style="border:1px solid #000;flex:1;min-height:2.6in;padding:6px;">
               <div style="font-weight:bold;font-size:8pt;margin-bottom:4px;">Special Notes / Sketch:</div>
             </div>
+            <!-- Stock needed (this detail x unit qty) -->
+            ${(()=>{const S=stockNeeded(detail);return S.length?`<div style="border:1px solid #000;padding:4px 6px;font-size:8pt;"><div style="font-weight:bold;margin-bottom:2px;">Stock Needed (× ${detailQty})</div>${S.map(g=>`<div style="display:flex;justify-content:space-between;gap:6px;"><span>${g.label}</span><span style="white-space:nowrap;"><strong>${g.ft.toFixed(1)} ft</strong> · ${g.pcs} pcs</span></div>`).join('')}</div>`:'';})()}
             <!-- Quoted labor hours (this detail) -->
             <div style="border:1px solid #000;padding:4px 6px;font-size:8pt;display:flex;justify-content:space-between;align-items:center;">
               <span style="font-weight:bold;">Quoted Hrs</span>
